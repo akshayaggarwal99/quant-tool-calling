@@ -51,7 +51,7 @@ for q, w in RUNG:
         lost, gained, p = mcnemar(base, v)
         N["Delta" + w] = f"{acc(v) - acc(base):+.2f}"
         N["Lost" + w], N["Gained" + w] = lost, gained
-        N["P" + w] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+        N["P" + w] = f"{p:.3f}" if p >= 0.001 else "$<$0.0001"
 N["SizeRatioFour"] = f"{100 * (MODELS / 'Qwen3-1.7B-Q4_K_M.gguf').stat().st_size / (MODELS / 'Qwen3-1.7B-Q8_0.gguf').stat().st_size:.0f}"
 N["CompressFour"] = f"{(MODELS / 'Qwen3-1.7B-Q4_K_M.gguf').stat().st_size / 3.8e9 * 100:.0f}"
 
@@ -108,6 +108,10 @@ for k in ("AccEight","AccFour","AccThree","DeltaThree","PThree","MaxRepRange","C
 # ============================================================ later arms, populated as they land
 import re, sys
 sys.path.insert(0, str(HERE))
+def _pf(x):
+    """p-value string -> float, tolerating the '$<$0.0001' display form."""
+    return float(str(x).replace('$', '').replace('<', '').strip() or 1)
+
 def _acc_rows(run_dir, cat_glob):
     sc = list((run_dir / "score").rglob(cat_glob)); rs = list((run_dir / "result").rglob(cat_glob))
     if not sc or not rs: return None
@@ -147,7 +151,7 @@ try:
                 lost, gained, p = mcnemar(G["Q8_0"], G[q])
                 extra["GsmDelta" + w] = f"{float(extra['GsmStrict'+w]) - float(extra['GsmStrictEight']):+.2f}"
                 extra["GsmLost" + w], extra["GsmGained" + w] = lost, gained
-                extra["GsmP" + w] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+                extra["GsmP" + w] = f"{p:.3f}" if p >= 0.001 else "$<$0.0001"
         L = ["\\begin{tabular}{@{}lrrrrrr@{}}", "\\toprule",
              "Rung & Strict & Lenient & Extractor gap & vs.\\ Q8\\_0 (strict) & McNemar $p$ & Median tokens \\\\", "\\midrule"]
         for q, w in RUNG:
@@ -156,7 +160,7 @@ try:
             if q == "Q8_0": L.append(f"{lab} & {extra['GsmStrict'+w]}\\% & {extra['GsmLenient'+w]}\\% & {extra['GsmGap'+w]}\\,pp & baseline & & {extra['GsmMedTok'+w]} \\\\")
             else:
                 d = extra["GsmDelta"+w].replace("-", "$-$").replace("+", "$+$"); pv = extra["GsmP"+w]
-                pv = f"\\textbf{{{pv}}}" if float(pv) < 0.05 else pv
+                pv = f"\\textbf{{{pv}}}" if _pf(pv) < 0.05 else pv
                 L.append(f"{lab} & {extra['GsmStrict'+w]}\\% & {extra['GsmLenient'+w]}\\% & {extra['GsmGap'+w]}\\,pp & {d}\\,pp & {pv} & {extra['GsmMedTok'+w]} \\\\")
         L += ["\\bottomrule", "\\end{tabular}"]; (TAB / "gsm8k.tex").write_text("\n".join(L) + "\n")
 except Exception as e:
@@ -174,7 +178,7 @@ for stem, w in MODELS_ARM:
             if q != "Q8_0" and (stem, q) in M:
                 lost, gained, p = mcnemar(M[(stem, "Q8_0")], M[(stem, q)])
                 extra[f"Delta{w}{rw}"] = f"{acc(M[(stem,q)]) - acc(M[(stem,'Q8_0')]):+.2f}"
-                extra[f"P{w}{rw}"] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+                extra[f"P{w}{rw}"] = f"{p:.3f}" if p >= 0.001 else "$<$0.0001"
                 extra[f"Lost{w}{rw}"], extra[f"Gained{w}{rw}"] = lost, gained
 if M:
     L = ["\\begin{tabular}{@{}llrrrrr@{}}", "\\toprule", "Model & Rung & $n$ & Accuracy & vs.\\ Q8\\_0 & Lost/Gained & McNemar $p$ \\\\", "\\midrule"]
@@ -187,7 +191,7 @@ if M:
                 if (stem, q) not in M: continue
                 a = extra[f"Acc{w}{rw}"]; n = extra[f"N{w}"]; d = extra.get(f"Delta{w}{rw}", "baseline"); p = extra.get(f"P{w}{rw}", ""); lg = f"{extra.get(f'Lost{w}{rw}','')}/{extra.get(f'Gained{w}{rw}','')}" if q != "Q8_0" else ""
             d = d if d == "baseline" else d.replace("-", "$-$").replace("+", "$+$") + "\\,pp"
-            if p and float(p) < 0.05: p = f"\\textbf{{{p}}}"
+            if p and _pf(p) < 0.05: p = f"\\textbf{{{p}}}"
             L.append(f"{stem} & {q.replace('_', chr(92)+'_')} & {n} & {a}\\% & {d} & {lg} & {p} \\\\")
         L.append("\\midrule")
     L = L[:-1] + ["\\bottomrule", "\\end{tabular}"]; (TAB / "models.tex").write_text("\n".join(L) + "\n")
@@ -198,7 +202,7 @@ for q, rw in (("Q4_K_M", "Four"), ("Q3_K_M", "Three")):
     if v:
         extra["HfourAcc" + rw] = f"{acc(v):.2f}"
         lost, gained, p = mcnemar(V[q], v)
-        extra["HfourDelta" + rw] = f"{acc(v) - acc(V[q]):+.2f}"; extra["HfourP" + rw] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+        extra["HfourDelta" + rw] = f"{acc(v) - acc(V[q]):+.2f}"; extra["HfourP" + rw] = f"{p:.3f}" if p >= 0.001 else "$<$0.0001"
         extra["HfourLost" + rw], extra["HfourGained" + rw] = lost, gained
 # --- H5: multi-turn at three rungs
 H5 = {}
@@ -209,7 +213,7 @@ if "Q8_0" in H5:
     for q, rw in RUNG:
         if q != "Q8_0" and q in H5:
             lost, gained, p = mcnemar(H5["Q8_0"], H5[q])
-            extra["MtDelta" + rw] = f"{acc(H5[q]) - acc(H5['Q8_0']):+.2f}"; extra["MtP" + rw] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+            extra["MtDelta" + rw] = f"{acc(H5[q]) - acc(H5['Q8_0']):+.2f}"; extra["MtP" + rw] = f"{p:.3f}" if p >= 0.001 else "$<$0.0001"
             extra["MtRel" + rw] = f"{(acc(H5[q]) - acc(H5['Q8_0'])) / acc(H5['Q8_0']) * 100:+.1f}"
             if "Delta" + rw in N: extra["SingleRel" + rw] = f"{float(N['Delta'+rw]) / float(N['AccEight']) * 100:+.1f}"
 
