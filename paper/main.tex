@@ -103,11 +103,18 @@ Q3\_K\_M is different in kind. It loses \qtLostThree{} questions that Q8\_0 gets
 \subsection{The free-form floor on the same weights}
 \label{sec:freeform}
 
-Table~\ref{tab:gsm8k} is the same five weight files on mathematics. The free-form floor sits exactly where the tool-calling floor sits, between Q4\_K\_M and Q3\_K\_M, and nowhere else: no rung above Q3\_K\_M differs from Q8\_0 under paired testing. So H1 as pre-registered fails. The schema does not break at a higher bit-width than prose.
+Figure~\ref{fig:ladder} puts both tasks on one axis and Table~\ref{tab:gsm8k} gives the numbers. The figure is the paper: on identical weights the tool-calling line barely moves and the free-form line falls off the bottom of the plot at the same rung, and the right panel shows why. The free-form floor sits exactly where the tool-calling floor sits, between Q4\_K\_M and Q3\_K\_M, and nowhere else: no rung above Q3\_K\_M differs from Q8\_0 under paired testing. So H1 as pre-registered fails. The schema does not break at a higher bit-width than prose.
 
 It fails in the direction we did not anticipate. At Q3\_K\_M free-form accuracy falls by \qtGsmDeltaThree{} points, against \qtDeltaThree{} for tool calling on identical weights. The output with no slack is the one that survives.
 
 The mechanism is in the last two columns of the table. At Q3\_K\_M, \qtGsmTruncThree{} of 400 generations hit the 4{,}096-token completion budget while still inside the chain of thought and never emit an answer; the median completion is the budget itself. This is the behaviour \citet{lotfi2026overthink} report under GPTQ and AWQ, reproduced here on the deployed format with no judge in the loop. Among the \qtGsmFinishedNThree{} generations that did finish, accuracy is \qtGsmFinishedAccThree{}\%, against \qtGsmFinishedAccEight{}\% for finished generations at Q8\_0, so a smaller genuine reasoning loss of about \qtGsmFinishedDrop{} points sits underneath the collapse. A tool call cannot pay that cost: at Q3\_K\_M the median tool-call generation is \qtToolNgenMedThree{} tokens, the 90th percentile \qtToolNgenPninezeroThree{}, and \qtToolNgenCapThree{} of \qtToolNgenReqsThree{} requests approached the budget. The reasoning runs away; the call is over before it can.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig1-ladder.pdf}
+\caption{(a) Accuracy across the quantization ladder on identical weight files: tool calling on \bfcl{} and free-form mathematics on GSM8K for \qm{}, with Qwen3-8B tool calling dashed. Both floors sit at Q3\_K\_M; the free-form drop is about eight times the tool-calling drop. (b) Cumulative distribution of completion length at Q8\_0 and Q3\_K\_M for each task. Tool calls are short at both rungs. Math generations at Q3\_K\_M pile up against the 4{,}096-token budget: \qtGsmTruncThree{} of 400 never finish. The reasoning runs away; the call is over before it can.}
+\label{fig:ladder}
+\end{figure}
 
 \begin{table}[t]
 \centering\small

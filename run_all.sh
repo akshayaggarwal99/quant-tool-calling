@@ -7,5 +7,6 @@ echo "run_all start $(date)"
 SUBSET=1 ./run_model.sh qwen3:8b-fp16  "Qwen/Qwen3-8B-FC"  Qwen3-8B  Q8_0 Q4_K_M Q3_K_M >> runs/queue.log 2>&1   # size, ~12 h
 CATEGORY=multi_turn_base ./run_model.sh qwen3:1.7b-fp16 "Qwen/Qwen3-1.7B-FC" Qwen3-1.7B Q8_0 Q4_K_M Q3_K_M >> runs/h5.log 2>&1  # H5, ~6 h
 echo QUEUE_COMPLETE >> runs/queue.log; echo H5_COMPLETE >> runs/h5.log
+./run_budget.sh >> runs/budget.log 2>&1                                              # budget control, ~4 h
 SUBSET=1 ./run_model.sh qwen3:14b-fp16 "Qwen/Qwen3-14B-FC" Qwen3-14B Q8_0 Q4_K_M Q3_K_M >> runs/queue.log 2>&1  # size, ~20 h
 echo ALL_COMPLETE; echo "run_all end $(date)"

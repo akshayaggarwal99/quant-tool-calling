@@ -190,3 +190,21 @@ median completion = cap. Extractor gap 0.00-0.50 pp at every rung.
   single-turn +0.3%. Direction matches H5, not significant at this n. Q3_K_M pending.
 
 Title must change: the pre-registered working title asserts the opposite of the result.
+
+### Stopped for thermal load; moved to bounded nightly windows (19 Sep, ~10:30)
+
+Author reported the Mac running hot. All compute stopped; one orphaned llama-server (the multi-turn
+Q3_K_M rung, left behind when run_model.sh was killed) had to be found and killed by path. Note for
+next time: kill llama-server first, then the drivers, or the server outlives them.
+
+nightly.sh now runs run_all.sh only from 23:00 for 5 h (START_H / HOURS env), hard-stopped by
+`timeout`, then kills any server. Every arm is resumable, so each night resumes where the last was
+cut. Remaining: multi-turn Q3_K_M (was mid-rung), the 16K-budget control on the 213 truncated
+Q3_K_M math items (folded inline into run_all.sh after multi-turn), then Qwen3-14B.
+
+Figure 1 added (analysis/figure.py -> paper/figures/fig1-ladder.pdf): both tasks on one axis plus
+completion-length CDFs. This is the figure that carries the paper.
+
+Second family: bartowski publishes DeepSeek-R1-Distill-Qwen-1.5B-f16.gguf, but BFCL's config has no
+R1-Distill model id string under any naming I tried; the deepseek_reasoning handler exists. Needs a
+config entry to be added or found before it is feasible. Deferred.
