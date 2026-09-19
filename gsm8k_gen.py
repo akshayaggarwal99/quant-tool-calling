@@ -12,6 +12,14 @@ PROMPT = ("Solve the following math problem step by step. "
 
 def one(rec):
     t0 = time.time()
+    try:
+        return _one(rec, t0)
+    except Exception as e:
+        return {"id": rec["id"], "gold": rec["gold"], "content": "", "reasoning": "",
+                "completion_tokens": None, "finish_reason": "error", "error": str(e)[:200],
+                "wall_s": round(time.time() - t0, 2)}
+
+def _one(rec, t0):
     r = client.chat.completions.create(model=MODEL, temperature=0.001, max_tokens=4096,
         messages=[{"role": "user", "content": PROMPT.format(q=rec["question"])}])
     m = r.choices[0].message

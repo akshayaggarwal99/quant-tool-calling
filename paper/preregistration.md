@@ -159,4 +159,6 @@ command.
 
 - Confirm BFCL v4 runs locally against an Ollama or llama.cpp endpoint without modification.
 - Read Lotfi et al. in full, not the abstract, and confirm the extraction method they used.
-- Decide the free-form control set and fix its extraction rules before any generation runs.
+- Free-form control set and extraction rules fixed 18 Sep 2026 before any rung was scored: 400 GSM8K test
+  questions at seed 42; strict = an explicit commitment in any of the three forms "The answer is N",
+  "#### N", \boxed{N}; lenient = last number in the visible answer. See gsm8k_score.py.

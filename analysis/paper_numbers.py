@@ -104,3 +104,115 @@ R += ["\\bottomrule", "\\end{tabular}"]
 (TAB / "repeats.tex").write_text("\n".join(R) + "\n")
 print(f"{len(N)} macros; ladder + repeats tables written")
 for k in ("AccEight","AccFour","AccThree","DeltaThree","PThree","MaxRepRange","CliffOverNoise","SizeRatioFour","RunsTotal"): print(f"  {k} = {N[k]}")
+
+# ============================================================ later arms, populated as they land
+import re, sys
+sys.path.insert(0, str(HERE))
+def _acc_rows(run_dir, cat_glob):
+    sc = list((run_dir / "score").rglob(cat_glob)); rs = list((run_dir / "result").rglob(cat_glob))
+    if not sc or not rs: return None
+    bad = set()
+    for l in sc[0].open():
+        l = l.strip()
+        if l:
+            try:
+                r = json.loads(l)
+                if "id" in r: bad.add(r["id"])
+            except Exception: pass
+    ids = set()
+    for l in rs[0].open():
+        l = l.strip()
+        if l:
+            try: ids.add(json.loads(l)["id"])
+            except Exception: pass
+    return {i: (i not in bad) for i in ids}
+
+extra = {}
+# --- free-form arm (GSM8K)
+try:
+    from gsm8k_score import score as gscore, strict as gstrict, lenient as glenient, norm as gnorm
+    G = {}
+    for q, w in RUNG:
+        f = RUNS / "gsm8k" / f"{q}.jsonl"
+        if f.exists() and sum(1 for _ in f.open()) >= 400:
+            rows = [json.loads(l) for l in f.open()]
+            G[q] = {r["id"]: (gnorm(gstrict(r["content"])) == gnorm(r["gold"])) for r in rows}
+            s = gscore(f)
+            extra["GsmStrict" + w] = f"{s['strict']:.2f}"; extra["GsmLenient" + w] = f"{s['lenient']:.2f}"
+            extra["GsmGap" + w] = f"{s['gap']:+.2f}"; extra["GsmMedTok" + w] = s["median_tokens"]
+            extra["GsmTrunc" + w] = s["truncated"]
+    if "Q8_0" in G:
+        for q, w in RUNG[1:]:
+            if q in G:
+                lost, gained, p = mcnemar(G["Q8_0"], G[q])
+                extra["GsmDelta" + w] = f"{float(extra['GsmStrict'+w]) - float(extra['GsmStrictEight']):+.2f}"
+                extra["GsmLost" + w], extra["GsmGained" + w] = lost, gained
+                extra["GsmP" + w] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+        L = ["\\begin{tabular}{@{}lrrrrrr@{}}", "\\toprule",
+             "Rung & Strict & Lenient & Extractor gap & vs.\\ Q8\\_0 (strict) & McNemar $p$ & Median tokens \\\\", "\\midrule"]
+        for q, w in RUNG:
+            if q not in G: continue
+            lab = q.replace("_", "\\_")
+            if q == "Q8_0": L.append(f"{lab} & {extra['GsmStrict'+w]}\\% & {extra['GsmLenient'+w]}\\% & {extra['GsmGap'+w]}\\,pp & baseline & & {extra['GsmMedTok'+w]} \\\\")
+            else:
+                d = extra["GsmDelta"+w].replace("-", "$-$").replace("+", "$+$"); pv = extra["GsmP"+w]
+                pv = f"\\textbf{{{pv}}}" if float(pv) < 0.05 else pv
+                L.append(f"{lab} & {extra['GsmStrict'+w]}\\% & {extra['GsmLenient'+w]}\\% & {extra['GsmGap'+w]}\\,pp & {d}\\,pp & {pv} & {extra['GsmMedTok'+w]} \\\\")
+        L += ["\\bottomrule", "\\end{tabular}"]; (TAB / "gsm8k.tex").write_text("\n".join(L) + "\n")
+except Exception as e:
+    print("gsm8k arm not ready:", e)
+
+# --- other models, simple_python at three rungs
+MODELS_ARM = [("Qwen3-8B", "EightB"), ("Qwen3-14B", "FourteenB")]
+M = {}
+for stem, w in MODELS_ARM:
+    for q, rw in RUNG:
+        v = _acc_rows(RUNS / stem / q, "*simple_python*.json")
+        if v: M[(stem, q)] = v; extra[f"Acc{w}{rw}"] = f"{acc(v):.2f}"; extra[f"N{w}"] = len(v)
+    if (stem, "Q8_0") in M:
+        for q, rw in RUNG:
+            if q != "Q8_0" and (stem, q) in M:
+                lost, gained, p = mcnemar(M[(stem, "Q8_0")], M[(stem, q)])
+                extra[f"Delta{w}{rw}"] = f"{acc(M[(stem,q)]) - acc(M[(stem,'Q8_0')]):+.2f}"
+                extra[f"P{w}{rw}"] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+                extra[f"Lost{w}{rw}"], extra[f"Gained{w}{rw}"] = lost, gained
+if M:
+    L = ["\\begin{tabular}{@{}llrrrrr@{}}", "\\toprule", "Model & Rung & $n$ & Accuracy & vs.\\ Q8\\_0 & Lost/Gained & McNemar $p$ \\\\", "\\midrule"]
+    for stem, w in [("Qwen3-1.7B", None)] + MODELS_ARM:
+        for q, rw in RUNG:
+            if stem == "Qwen3-1.7B":
+                if q not in ("Q8_0", "Q4_K_M", "Q3_K_M"): continue
+                a = N["Acc"+rw]; n = N["N"]; d = N.get("Delta"+rw, "baseline"); p = N.get("P"+rw, ""); lg = f"{N.get('Lost'+rw,'')}/{N.get('Gained'+rw,'')}" if q != "Q8_0" else ""
+            else:
+                if (stem, q) not in M: continue
+                a = extra[f"Acc{w}{rw}"]; n = extra[f"N{w}"]; d = extra.get(f"Delta{w}{rw}", "baseline"); p = extra.get(f"P{w}{rw}", ""); lg = f"{extra.get(f'Lost{w}{rw}','')}/{extra.get(f'Gained{w}{rw}','')}" if q != "Q8_0" else ""
+            d = d if d == "baseline" else d.replace("-", "$-$").replace("+", "$+$") + "\\,pp"
+            if p and float(p) < 0.05: p = f"\\textbf{{{p}}}"
+            L.append(f"{stem} & {q.replace('_', chr(92)+'_')} & {n} & {a}\\% & {d} & {lg} & {p} \\\\")
+        L.append("\\midrule")
+    L = L[:-1] + ["\\bottomrule", "\\end{tabular}"]; (TAB / "models.tex").write_text("\n".join(L) + "\n")
+
+# --- H4: penalty vs none, same weights
+for q, rw in (("Q4_K_M", "Four"), ("Q3_K_M", "Three")):
+    v = _acc_rows(RUNS / "h4" / q, "*simple_python*.json")
+    if v:
+        extra["HfourAcc" + rw] = f"{acc(v):.2f}"
+        lost, gained, p = mcnemar(V[q], v)
+        extra["HfourDelta" + rw] = f"{acc(v) - acc(V[q]):+.2f}"; extra["HfourP" + rw] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+        extra["HfourLost" + rw], extra["HfourGained" + rw] = lost, gained
+# --- H5: multi-turn at three rungs
+H5 = {}
+for q, rw in RUNG:
+    v = _acc_rows(RUNS / "Qwen3-1.7B" / "multi_turn_base" / q, "*multi_turn_base*.json")
+    if v: H5[q] = v; extra["MtAcc" + rw] = f"{acc(v):.2f}"; extra["MtN"] = len(v)
+if "Q8_0" in H5:
+    for q, rw in RUNG:
+        if q != "Q8_0" and q in H5:
+            lost, gained, p = mcnemar(H5["Q8_0"], H5[q])
+            extra["MtDelta" + rw] = f"{acc(H5[q]) - acc(H5['Q8_0']):+.2f}"; extra["MtP" + rw] = f"{p:.3f}" if p >= 0.001 else f"{p:.4f}"
+            extra["MtRel" + rw] = f"{(acc(H5[q]) - acc(H5['Q8_0'])) / acc(H5['Q8_0']) * 100:+.1f}"
+            if "Delta" + rw in N: extra["SingleRel" + rw] = f"{float(N['Delta'+rw]) / float(N['AccEight']) * 100:+.1f}"
+
+with (TAB / "numbers.tex").open("a") as f:
+    for k, v in extra.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
+print(f"later arms: {len(extra)} macros added; tables present:", sorted(p.name for p in TAB.glob("*.tex")))

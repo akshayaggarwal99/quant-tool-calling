@@ -125,3 +125,27 @@ Gotcha: a script named numbers.py shadows the stdlib module that `statistics` im
 to paper_numbers.py.
 
 Repo initialised and tagged prereg-v1.
+
+### Caught a strawman extractor (18 Sep, before any rung scored)
+
+First 59 GSM8K generations at Q8_0: my strict regex ("The answer is N" only) scored 31/59, lenient
+52/59. All 21 misses were `\boxed{N}` under a "Final Answer" heading, which is the commit format
+reasoning models actually emit despite the prompt. Reporting that gap would have been reporting my
+regex. Strict now accepts any explicit commitment ("The answer is", "#### N", \boxed{N}); lenient is
+last-number. Rules recorded in the prereg before scoring. Whatever gap remains after this is real.
+
+Queue launched behind the GSM8K arm: Qwen3-4B (3 rungs, n=400), Qwen3-8B (3 rungs, n=200), H4 logit
+penalty on 1.7B at Q4/Q3, Qwen3-14B (3 rungs, n=200). Rough serial estimate ~2 days on the Mac.
+DeepSeek-R1-Distill and Llama-3.1 have no FP16 on Ollama; deferred as a stretch arm needing an HF
+conversion.
+
+### Two bugs caught in the first hour of the free-form arm (18 Sep, late)
+
+1. `llama-server -c 8192` with four slots under unified KV is a shared 8,192-token budget. Four
+   concurrent reasoning traces overflowed it, the server returned 500 "Context size has been
+   exceeded", and ThreadPoolExecutor.map re-raised it and killed the generator at item 59, 28, 28.
+   Fix: per-item try/except recording an `error` row so a run always completes, and `-c 32768` in
+   both runners. Partial rung files deleted; arm relaunched from Q8_0.
+2. BFCL has no local FC entry for the original Qwen3-4B, only Qwen3-4B-Instruct-2507, a different
+   lineage. Dropped 4B rather than confound the within-family size comparison. Span is now 1.7B,
+   8B (n=200), 14B (n=200). H4 runs between 8B and 14B.
