@@ -217,6 +217,7 @@ if "Q8_0" in H5:
             extra["MtRel" + rw] = f"{(acc(H5[q]) - acc(H5['Q8_0'])) / acc(H5['Q8_0']) * 100:+.1f}"
             if "Delta" + rw in N: extra["SingleRel" + rw] = f"{float(N['Delta'+rw]) / float(N['AccEight']) * 100:+.1f}"
 
+extra["GsmGapMax"] = f"{max(abs(float(extra[k])) for k in extra if k.startswith('GsmGap')):.2f}"
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in extra.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"later arms: {len(extra)} macros added; tables present:", sorted(p.name for p in TAB.glob("*.tex")))
