@@ -102,3 +102,26 @@ Test cost about ten cents.
 
 **Q8_0, simple_python, 400/400 entries, 91.75%.** Roughly 100 minutes, matching the estimate.
 Q6_K running next.
+
+### Ladder complete, repeats complete, scaffold drafted (18 Sep, evening)
+
+Full ladder and both repeat arms finished. Analysis in out/day1-findings.md. Headline for
+Qwen3-1.7B on simple_python: flat Q8_0 through Q4_K_M (Q4 vs Q8 +0.25 pp, McNemar p=1.000), cliff
+at Q3_K_M (-4.75 pp, p=0.004). Same-weights repeats move at most 0.50 pp and flip at most 4 of 400
+questions, so the cliff is ~10x instrument noise. H1 is looking unsupported: the tool-calling floor
+sits where the published free-form floor sits. Not yet a fair test until the free-form arm runs on
+these weights.
+
+Free-form arm launched: 400 GSM8K test questions (seed 42) through the same server alias, all five
+rungs, full generations logged for re-scoring under strict and lenient extractors. ~110 min per
+rung, overnight.
+
+Paper scaffold at paper/main.tex, 5 pages, 12 red BLOCKED slots for unmeasured arms, every
+number a macro from analysis/paper_numbers.py. Bib has 9 entries; kurt2026quant, lotfi2026overthink
+and bfcl2025 verified against source pages. Caught and fixed my own error: 2601.14277 is single-
+author (Uygar Kurt), not "Wang et al." as I had written in the prereg from memory.
+
+Gotcha: a script named numbers.py shadows the stdlib module that `statistics` imports. Renamed
+to paper_numbers.py.
+
+Repo initialised and tagged prereg-v1.

@@ -123,7 +123,13 @@ One model has been measured at the time of this draft, on the easiest \bfcl{} ca
 \blocked{Written after the free-form and multi-model arms. Shape: for the models measured, the k-quant floor for tool calling sits at [where]; the free-form floor on the same weights sits at [where], so [H1 verdict]; the deployment table gives practitioners the rung to stop at; the one thing a reviewer should take from this is the reproducibility figure, because it is what makes every other number interpretable.}
 
 \section*{Reproducibility}
-Every number in this paper expands from \texttt{paper/tables/numbers.tex}, which \texttt{analysis/paper\_numbers.py} recomputes from the raw \bfcl{} result and score files in \texttt{runs/}. The ladder is rebuilt from the FP16 source by \texttt{run\_ladder.sh}, the repeats by \texttt{run\_repeats.sh} and the free-form arm by \texttt{run\_gsm8k.sh}. All raw generations are retained. \blocked{Repository URL and release tag.}
+Every number in this paper is a macro recomputed from the raw \bfcl{} result and score files; nothing is typed by hand. All raw generations are retained.
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item \path{analysis/paper_numbers.py} writes \path{paper/tables/numbers.tex} and both tables from \path{runs/}.
+\item \path{run_ladder.sh} rebuilds the ladder from the FP16 source and scores it.
+\item \path{run_repeats.sh} and \path{run_gsm8k.sh} produce the reproducibility and free-form arms.
+\end{itemize}
+\blocked{Repository URL and release tag.}
 
 \bibliographystyle{plainnat}
 \bibliography{refs}
