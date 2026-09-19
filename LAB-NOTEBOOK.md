@@ -164,3 +164,29 @@ Preliminary, Q8_0 GSM8K, n=400: strict 86.25%, lenient 86.50%, gap +0.25 pp. Wit
 extractor the parser effect is a quarter of a point. 28 of 400 hit the 4,096-token cap still inside
 the thinking trace and produced no visible answer (25 empty contents); they score as failures under
 both extractors, which is the right call, and the count is reported per rung as GsmTrunc.
+
+## 19 Sep 2026 — overnight campaign
+
+Driver fired 23:00:03. GSM8K (5 rungs), H4 (2 rungs) and Qwen3-8B (3 rungs, n=200) all finished by
+04:55; multi-turn on Q3_K_M running at 09:xx; 14B queued.
+
+### Free-form control (GSM8K, n=400, strict/lenient)
+Q8_0 86.25/86.50, Q6_K 86.50/86.50, Q5_K_M 88.75/89.25, Q4_K_M 85.50/85.75, Q3_K_M 46.75/46.75.
+Q3_K_M: -39.50 pp vs Q8_0, McNemar p<0.0001; 213 of 400 hit the 4,096-token cap still thinking,
+median completion = cap. Extractor gap 0.00-0.50 pp at every rung.
+
+### Verdicts
+- H1 (schema breaks first): NOT SUPPORTED, and reversed. Both floors sit between Q4_K_M and Q3_K_M
+  on the same weights, but the free-form drop is 39.5 pp against 4.75 pp for tool calling. The
+  schema is the more robust output, not the more fragile one.
+- H3 (extractor bounds free-form drop): NULL. With a fair strict extractor the gap is at most
+  0.50 pp. Lotfi et al.'s failures are not a parsing artifact in our data; at Q3_K_M they are
+  chain-of-thought explosions that never produce an answer.
+- 8B (n=200): Q8_0 95.50, Q4_K_M 96.50, Q3_K_M 96.50. No cliff. The 3-bit cliff at 1.7B is gone at
+  8B (p=0.688). Floor moves down with size, now shown for tool calling.
+- H4 (marker logit penalty, -2.0 on 8 tokens): exactly zero effect at Q4 (92.00 -> 92.00, 2 lost/
+  2 gained) and Q3 (87.00 -> 87.00). NULL. Tool-call outputs barely emit the marker tokens.
+- H5 (multi-turn, partial n=200): Q8_0 17.00, Q4_K_M 13.50, -3.50 pp, p=0.230, relative -20.6% vs
+  single-turn +0.3%. Direction matches H5, not significant at this n. Q3_K_M pending.
+
+Title must change: the pre-registered working title asserts the opposite of the result.

@@ -20,7 +20,7 @@
 \newcommand{\bfcl}{BFCL}
 \newcommand{\qm}{Qwen3-1.7B}
 
-\title{Flat to Four Bits, Off a Cliff at Three:\\Where Quantization Breaks Agentic Tool Calling}
+\title{The Schema Holds Where the Reasoning Collapses:\\Quantization Floors for Agentic Tool Calling}
 \author{Akshay Kumar\\Independent Researcher\\\texttt{akumar8@mt.iitr.ac.in}}
 \date{}
 
@@ -28,7 +28,7 @@
 \maketitle
 
 \begin{abstract}
-\blocked{Written last. Shape: what practitioners run (k-quants), what has been measured for them (prose, knowledge, reasoning), what has not (tool calling); the ladder design; the one-model result with the cliff and the reproducibility figure; the free-form comparison and the verdict on H1; the multi-model result; the deployment table as the deliverable.}
+Models reach laptops through post-training quantization, and the format that actually ships is the llama.cpp k-quant. Its cost has been measured on prose, knowledge and reasoning, never on what an agent does, which is emit a function call that a program executes. We build a controlled ladder, five k-quant formats from one FP16 source, and score each rung on the Berkeley Function Calling Leaderboard by deterministic syntax-tree matching, with no model judging another anywhere in the pipeline. We pre-registered the intuition that a function signature, having no slack, would break at a higher bit-width than free-form text. It does not. On \qm{} tool calling is flat from Q8\_0 through Q4\_K\_M and loses \qtDeltaThree{} points at Q3\_K\_M, about \qtCliffOverNoise{} times the run-to-run noise we measure by re-running identical weights. On the same weights, free-form mathematics loses \qtGsmDeltaThree{} points at the same rung, because \qtGsmTruncPctThree{}\% of generations run out of a 4{,}096-token budget still inside the chain of thought. The schema survives because its output is short. The cliff is absent on Qwen3-8B, a fair answer extractor moves the free-form numbers by at most \qtGsmGapFive{} points, and a logit penalty on overthinking markers does nothing to tool calling at either rung. The deployment table answers the question practitioners currently guess at: for agents, four bits is safe and three is not, and the risk that quantization poses to reasoning does not transfer to the call.
 \end{abstract}
 
 \section{Introduction}
@@ -41,9 +41,9 @@ An agent calls tools. It emits a function name and a set of typed arguments that
 
 We build a controlled ladder, five k-quant formats produced from one FP16 source, and score each rung on the Berkeley Function Calling Leaderboard \citep{bfcl2025}, which compares a model's call to a reference by deterministic abstract-syntax-tree matching. No model judges another model anywhere in the pipeline. We then run the same weights on a free-form control so that the two floors can be compared on identical parameters.
 
-For \qm{} the answer is not the one we expected. Tool-calling accuracy is flat from Q8\_0 through Q4\_K\_M and falls by \qtDeltaThree{} points at Q3\_K\_M, roughly \qtCliffOverNoise{} times the run-to-run noise of the instrument. \blocked{One sentence on where the free-form floor sits on the same weights and whether H1 holds.} \blocked{One sentence on whether the pattern holds across model sizes.}
+For \qm{} the answer is the reverse of the one we expected. Tool-calling accuracy is flat from Q8\_0 through Q4\_K\_M and falls by \qtDeltaThree{} points at Q3\_K\_M, roughly \qtCliffOverNoise{} times the run-to-run noise of the instrument. On the same weights free-form mathematics falls by \qtGsmDeltaThree{} points at the same rung. Both floors sit between four and three bits, but the schema is the output that survives, by a factor of about eight. The reason is length: at three bits the model's reasoning runs away, and \qtGsmTruncPctThree{}\% of math generations exhaust their token budget without ever answering, while a tool call is a median of \qtToolNgenMedThree{} tokens and has no room to do so. On Qwen3-8B the cliff is gone at every rung we ran.
 
-\paragraph{Contributions.} A controlled k-quant ladder for agentic tool calling, built from one source per model so that only the weights change between rungs (\S\ref{sec:method}). A reproducibility measurement that most quantization papers omit: the same weights run three times, which bounds what a ladder difference can mean (\S\ref{sec:repro}). The floor for \qm{}, located between Q4\_K\_M and Q3\_K\_M by paired testing (\S\ref{sec:ladder}). \blocked{The free-form comparison on identical weights and the resulting verdict on H1 (\S\ref{sec:freeform}).} \blocked{The same measurement across model families and sizes (\S\ref{sec:models}).} A deployment table that answers the question practitioners currently guess at.
+\paragraph{Contributions.} A controlled k-quant ladder for agentic tool calling, built from one source per model so that only the weights change between rungs (\S\ref{sec:method}). A reproducibility measurement that most quantization papers omit: the same weights run three times, which bounds what a ladder difference can mean (\S\ref{sec:repro}). The floor for \qm{}, located between Q4\_K\_M and Q3\_K\_M by paired testing (\S\ref{sec:ladder}). The free-form comparison on identical weights, which reverses H1 and locates the mechanism in chain-of-thought length rather than in the schema (\S\ref{sec:freeform}). The same measurement at 8B, where the cliff disappears (\S\ref{sec:models}). A deployment table that answers the question practitioners currently guess at.
 
 \section{Related work}
 
@@ -66,7 +66,11 @@ For \qm{} the answer is not the one we expected. Tool-calling accuracy is flat f
 
 \paragraph{Reproducibility control.} Two rungs, Q8\_0 and Q4\_K\_M, were run three times each with identical weights and settings. This bounds the run-to-run variation of the instrument, without which a ladder difference cannot be interpreted.
 
-\paragraph{Free-form control.} \blocked{The same five GGUFs on 400 GSM8K test questions drawn at seed 42, full generations logged, scored under a strict extractor and a lenient one. Generation is running at the time of this draft.}
+\paragraph{Free-form control.} The same five weight files answer 400 GSM8K test questions \citep{gsm8k2021}, drawn at seed 42, through the same server under the same alias, with a 4{,}096-token completion budget. Every generation is logged in full so that scoring under a different extractor is a re-read rather than a re-run. Two extractors were fixed before any rung was scored. Strict accepts an explicit commitment in any of three forms: ``The answer is $N$'', ``\#\#\#\# $N$'', or $\backslash$boxed$\{N\}$. Lenient takes the last number in the visible answer. We record that our first strict rule accepted only the first form and would have scored 21 of the first 59 generations wrong for writing the answer in a box; that rule was a strawman and was replaced before scoring, and the gap it would have produced is not reported anywhere in this paper.
+
+\paragraph{Larger model.} Qwen3-8B, same three rungs Q8\_0, Q4\_K\_M and Q3\_K\_M from its own FP16 source, on the first \qtNEightB{} questions of the same category in file order. \blocked{Qwen3-14B under the same protocol, queued.}
+
+\paragraph{Overthinking penalty.} \citet{lotfi2026overthink} report that a fixed logit penalty on a curated list of overthinking markers cuts chain-of-thought length by 12 to 23\% while preserving accuracy. We apply a fixed penalty of $-2.0$ to the eight Qwen3 tokens for \emph{wait}, \emph{but}, \emph{alternatively} and \emph{hmm} in both capitalisations, at the server, and re-run the \qm{} ladder at Q4\_K\_M and Q3\_K\_M. This is an approximation of their method with one $\lambda$, stated as such.
 
 \section{Results}
 
@@ -99,28 +103,50 @@ Q3\_K\_M is different in kind. It loses \qtLostThree{} questions that Q8\_0 gets
 \subsection{The free-form floor on the same weights}
 \label{sec:freeform}
 
-\blocked{Per-rung GSM8K accuracy under the strict extractor and under the lenient one, the same paired test against Q8\_0, and the location of the free-form floor. Then the verdict on H1: if the free-form floor also sits between Q4\_K\_M and Q3\_K\_M, H1 is not supported and the paper says so; if it sits higher, H1 holds. Also the gap between the two extractors per rung, which bounds how much of the free-form drop is the parser (H3), and median completion length per rung against the chain-of-thought inflation Lotfi et al.\ report.}
+Table~\ref{tab:gsm8k} is the same five weight files on mathematics. The free-form floor sits exactly where the tool-calling floor sits, between Q4\_K\_M and Q3\_K\_M, and nowhere else: no rung above Q3\_K\_M differs from Q8\_0 under paired testing. So H1 as pre-registered fails. The schema does not break at a higher bit-width than prose.
+
+It fails in the direction we did not anticipate. At Q3\_K\_M free-form accuracy falls by \qtGsmDeltaThree{} points, against \qtDeltaThree{} for tool calling on identical weights. The output with no slack is the one that survives.
+
+The mechanism is in the last two columns of the table. At Q3\_K\_M, \qtGsmTruncThree{} of 400 generations hit the 4{,}096-token completion budget while still inside the chain of thought and never emit an answer; the median completion is the budget itself. This is the behaviour \citet{lotfi2026overthink} report under GPTQ and AWQ, reproduced here on the deployed format with no judge in the loop. Among the \qtGsmFinishedNThree{} generations that did finish, accuracy is \qtGsmFinishedAccThree{}\%, against \qtGsmFinishedAccEight{}\% for finished generations at Q8\_0, so a smaller genuine reasoning loss of about \qtGsmFinishedDrop{} points sits underneath the collapse. A tool call cannot pay that cost: at Q3\_K\_M the median tool-call generation is \qtToolNgenMedThree{} tokens, the 90th percentile \qtToolNgenPninezeroThree{}, and \qtToolNgenCapThree{} of \qtToolNgenReqsThree{} requests approached the budget. The reasoning runs away; the call is over before it can.
+
+\begin{table}[t]
+\centering\small
+\input{tables/gsm8k.tex}
+\caption{The free-form control, GSM8K, $n=400$ per rung, identical weight files to Table~\ref{tab:ladder}. Extractor gap is lenient minus strict. Median tokens is the completion length; the budget was 4{,}096.}
+\label{tab:gsm8k}
+\end{table}
+
+\paragraph{The extractor is not the story.} The gap between strict and lenient scoring is at most \qtGsmGapFive{} points at any rung. H3 predicted a gap of at least five points that would bound how much published free-form degradation is the parser. There is no such gap once strict accepts the commitment format reasoning models actually emit. The failures at Q3\_K\_M are generations with no answer in them, not answers a parser missed.
 
 \subsection{Across models}
 \label{sec:models}
 
-\blocked{The same ladder on the remaining models in the pre-registration: DeepSeek-R1-Distill-Qwen 1.5B and 7B for comparability with Lotfi et al., Qwen3 4B, 8B and 14B, Llama 3.1 8B. The deployment table is this section's product.}
+Table~\ref{tab:models} adds Qwen3-8B at the three rungs that matter. The cliff is gone. Q3\_K\_M scores \qtAccEightBThree{}\% against \qtAccEightBEight{}\% at Q8\_0, a difference of \qtDeltaEightBThree{} points at $p=\qtPEightBThree{}$, and Q4\_K\_M is likewise indistinguishable from the baseline. On this family the three-bit floor that binds at 1.7B has moved below the ladder by 8B, which is the direction the free-form literature reports for larger models and is now shown for the call itself. \blocked{One sentence for Qwen3-14B when it lands.}
+
+\begin{table}[t]
+\centering\small
+\input{tables/models.tex}
+\caption{Tool calling across model size, \texttt{simple\_python}. Qwen3-1.7B at $n=400$; Qwen3-8B at $n=\qtNEightB{}$. Each model is compared against its own Q8\_0.}
+\label{tab:models}
+\end{table}
 
 \subsection{Harder categories}
 
-\blocked{Multi-turn, parallel and irrelevance categories on at least the model above. H5 predicts multi-turn degradation at least twice the single-turn relative drop.}
+The pre-registration predicted that multi-turn trajectories, where an error in one call corrupts the state for the next, would degrade at least twice as fast as single calls. On \bfcl{}'s \texttt{multi\_turn\_base}, $n=\qtMtN{}$, \qm{} scores \qtMtAccEight{}\% at Q8\_0 and \qtMtAccFour{}\% at Q4\_K\_M, a relative drop of \qtMtRelFour{}\% against \qtSingleRelFour{}\% for single calls at the same rung. The direction is as predicted and the magnitude clears the threshold, but at $p=\qtMtPFour{}$ with a \qtMtAccEight{}\% base rate the test is underpowered, and we do not claim it. \blocked{Q3\_K\_M multi-turn, running at the time of this draft.}
 
 \subsection{Does the overthinking penalty transfer}
 
-\blocked{H4. The training-free logit penalty on overthinking markers from Lotfi et al., applied at Q4\_K\_M and Q3\_K\_M, and its effect on schema validity. Their own scope statement says the marker list is curated for English reasoning models and the evaluation covers only mathematics, code and science, so a null here is informative and is reported either way.}
+It does nothing. With the penalty, \qm{} scores \qtHfourAccFour{}\% at Q4\_K\_M and \qtHfourAccThree{}\% at Q3\_K\_M, identical to the unpenalised runs to two decimals; at each rung \qtHfourLostFour{} questions flip one way and \qtHfourGainedFour{} the other. H4 predicted a loss of at least three points and there is no loss. The explanation follows from \S\ref{sec:freeform}: the penalty acts on tokens a reasoning trace emits and a tool call does not, so on a \qtToolNgenMedThree{}-token output it has nothing to act on. This is consistent with the authors' own scope statement that the marker list was curated for free-form English reasoning, and it means the fix and the failure it fixes both live in the reasoning trace rather than in the call.
 
 \section{Limitations}
 
-One model has been measured at the time of this draft, on the easiest \bfcl{} category, on one hardware platform. The ladder is one quantization family; GPTQ, AWQ and the other research methods are deliberately out of scope, and multilingual degradation is excluded because it is already covered. The reproducibility control was run on two rungs rather than all five. \blocked{Anything the free-form and multi-model arms add.}
+Two models from one family, on the easiest \bfcl{} category plus one multi-turn set, on one hardware platform. The ladder is one quantization family; GPTQ, AWQ and the other research methods are deliberately out of scope, and multilingual degradation is excluded because it is already covered. The reproducibility control was run on two rungs rather than all five. The free-form control uses a 4{,}096-token budget, and the collapse at Q3\_K\_M is partly a property of that budget: a larger budget would recover some of the \qtGsmTruncThree{} truncated generations, though the \qtGsmFinishedDrop{}-point loss among finished generations would remain. The overthinking penalty is one fixed $\lambda$ rather than the authors' tuned value. Multi-turn is underpowered at $n=\qtMtN{}$ and a 17\% base rate. \blocked{Qwen3-14B and the Q3\_K\_M multi-turn rung.}
 
 \section{Conclusion}
 
-\blocked{Written after the free-form and multi-model arms. Shape: for the models measured, the k-quant floor for tool calling sits at [where]; the free-form floor on the same weights sits at [where], so [H1 verdict]; the deployment table gives practitioners the rung to stop at; the one thing a reviewer should take from this is the reproducibility figure, because it is what makes every other number interpretable.}
+We set out to show that a function signature, having no slack, would be the first thing quantization breaks. On the deployed format and with no judge anywhere in the pipeline, it is the last. For \qm{} the tool-calling floor and the free-form floor sit at the same rung, between four and three bits, but the call loses \qtDeltaThree{} points where the reasoning loses \qtGsmDeltaThree{}, and the difference is length: three-bit weights make the chain of thought run away, and a call is finished before it can. On Qwen3-8B there is no cliff at all. A fair extractor moves nothing, and a penalty designed for the reasoning trace has nothing to act on in the call. For anyone deploying an agent on a laptop the table says four bits is safe and three is not, and that the risk quantization poses to reasoning is a risk to the reasoning, not to the tool.
+
+The number we would ask a reader to take from this is not on the ladder. It is the reproducibility figure: identical weights re-run three times moved by at most \qtMaxRepRange{} points. That is what lets every other difference in the paper mean something, and it is what most quantization studies leave out.
 
 \section*{Reproducibility}
 Every number in this paper is a macro recomputed from the raw \bfcl{} result and score files; nothing is typed by hand. All raw generations are retained.

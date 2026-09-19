@@ -216,3 +216,25 @@ if "Q8_0" in H5:
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in extra.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"later arms: {len(extra)} macros added; tables present:", sorted(p.name for p in TAB.glob("*.tex")))
+
+# ============================================================ mechanism macros
+mech = {}
+try:
+    from gsm8k_score import strict as gstrict, norm as gnorm
+    for q, w in (("Q8_0", "Eight"), ("Q3_K_M", "Three")):
+        rows = [json.loads(l) for l in (RUNS / "gsm8k" / f"{q}.jsonl").open()]
+        tr = [r for r in rows if r["finish_reason"] == "length"]; fin = [r for r in rows if r["finish_reason"] != "length"]
+        c = lambda rs: sum(gnorm(gstrict(r["content"])) == gnorm(r["gold"]) for r in rs)
+        mech["GsmFinishedN" + w] = len(fin); mech["GsmFinishedAcc" + w] = f"{100*c(fin)/len(fin):.1f}"
+        mech["GsmTruncCorrect" + w] = c(tr)
+    mech["GsmFinishedDrop"] = f"{float(mech['GsmFinishedAccEight']) - float(mech['GsmFinishedAccThree']):.1f}"
+    mech["GsmTruncPctThree"] = f"{100*int(N.get('GsmTruncThree', extra.get('GsmTruncThree', 0)))/400:.0f}"
+    for q, w in (("Q8_0", "Eight"), ("Q3_K_M", "Three")):
+        ng = sorted(int(m) for m in re.findall(r"n_gen =\s*(\d+)", (RUNS / f"{q}.server.log").read_text()))
+        mech["ToolNgenMed" + w] = ng[len(ng)//2]; mech["ToolNgenPninezero" + w] = ng[int(.9*len(ng))]
+        mech["ToolNgenReqs" + w] = len(ng); mech["ToolNgenCap" + w] = sum(1 for x in ng if x >= 4000)
+except Exception as e:
+    print("mechanism macros not ready:", e)
+with (TAB / "numbers.tex").open("a") as f:
+    for k, v in mech.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
+print(f"mechanism: {len(mech)} macros")
