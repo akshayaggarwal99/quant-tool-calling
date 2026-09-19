@@ -30,7 +30,15 @@ def _one(rec, t0):
             "finish_reason": r.choices[0].finish_reason, "wall_s": round(time.time() - t0, 2)}
 
 recs = [json.loads(l) for l in open("gsm8k_400.jsonl")]
-with open(OUT, "w") as f, ThreadPoolExecutor(4) as ex:
+import os
+done = set()
+if os.path.exists(OUT):
+    for l in open(OUT):
+        try: done.add(json.loads(l)["id"])
+        except Exception: pass
+recs = [r for r in recs if r["id"] not in done]
+print(f"  resuming: {len(done)} done, {len(recs)} to go", flush=True)
+with open(OUT, "a") as f, ThreadPoolExecutor(4) as ex:
     for i, res in enumerate(ex.map(one, recs), 1):
         f.write(json.dumps(res) + "\n"); f.flush()
         if i % 50 == 0: print(f"  {i}/400", flush=True)

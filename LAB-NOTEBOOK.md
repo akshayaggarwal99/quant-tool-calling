@@ -149,3 +149,18 @@ conversion.
 2. BFCL has no local FC entry for the original Qwen3-4B, only Qwen3-4B-Instruct-2507, a different
    lineage. Dropped 4B rather than confound the within-family size comparison. Span is now 1.7B,
    8B (n=200), 14B (n=200). H4 runs between 8B and 14B.
+
+### Paused for the author's RAM; scheduled to resume 23:00 (18 Sep, ~19:15)
+
+All jobs stopped, 16 GB returned. Generator made resumable (append mode, skips finished ids) so the
+partial Q6_K rung (150/400) continues rather than restarts. New sequential driver run_all.sh runs the
+arms in paper-priority order, GSM8K -> H4 -> 8B -> multi-turn -> 14B, each to its own log so the
+skip logic and wake-up watchers still work. Launched via a sleep-until-23:00 wrapper under
+caffeinate -i so the Mac does not idle-sleep mid-run.
+
+Observed rate on the free-form arm is ~7 items/min, faster than the 110 min/rung estimate.
+
+Preliminary, Q8_0 GSM8K, n=400: strict 86.25%, lenient 86.50%, gap +0.25 pp. With a fair strict
+extractor the parser effect is a quarter of a point. 28 of 400 hit the 4,096-token cap still inside
+the thinking trace and produced no visible answer (25 empty contents); they score as failures under
+both extractors, which is the right call, and the count is reported per rung as GsmTrunc.
