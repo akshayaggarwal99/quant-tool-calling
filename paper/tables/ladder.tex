@@ -1,0 +1,11 @@
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Rung & Size (GB) & Accuracy & vs.\ Q8\_0 & Lost & Gained & McNemar $p$ \\
+\midrule
+Q8\_0 & 2.2 & 91.75\% & baseline & & & \\
+Q6\_K & 1.7 & 93.50\% & $+$1.75\,pp & 6 & 13 & 0.167 \\
+Q5\_K\_M & 1.5 & 90.75\% & $-$1.00\,pp & 10 & 6 & 0.454 \\
+Q4\_K\_M & 1.3 & 92.00\% & $+$0.25\,pp & 13 & 14 & 1.000 \\
+Q3\_K\_M & 1.1 & 87.00\% & $-$4.75\,pp & 30 & 11 & \textbf{0.004} \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,10 @@
+.venv/
+bfcl_root/
+models/
+runs/*/result/
+runs/*/score/
+runs/*.server.log
+runs/gsm8k/*.server.log
+*.pdf
+*.log
+*.aux
