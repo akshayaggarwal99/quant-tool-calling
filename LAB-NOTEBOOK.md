@@ -219,3 +219,13 @@ Q3_K_M rung to completion (13:03-16:16) and 16 items of the budget control befor
 19:34. This is the exact heat the schedule was meant to avoid. Replaced with a launchd
 StartCalendarInterval job at 23:00 plus a pmset repeat wake at 22:58, so the machine wakes first
 and the job fires on the clock rather than on a sleeping process.
+
+## 21 Sep 2026
+
+### Second scheduler failure: launchd fired on time and the script died on line 8
+The Mac was awake and launchd ran nightly.sh at 23:00:00 exactly. It exited in the same second with
+`timeout: command not found`. Homebrew's coreutils provides `timeout` at /opt/homebrew/bin, but launchd
+starts scripts with a bare system PATH that does not include it. Fix: export PATH at the top of
+nightly.sh, plus a hand-rolled watchdog fallback if gtimeout is ever absent. Verified the bounded
+branch kills a process on schedule (exit 124). Reloaded the job. 14B FP16 pulled during the day so
+the download does not consume the window. Lesson: anything launchd runs needs an explicit PATH.
