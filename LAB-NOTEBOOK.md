@@ -208,3 +208,14 @@ completion-length CDFs. This is the figure that carries the paper.
 Second family: bartowski publishes DeepSeek-R1-Distill-Qwen-1.5B-f16.gguf, but BFCL's config has no
 R1-Distill model id string under any naming I tried; the deepseek_reasoning handler exists. Needs a
 config entry to be added or found before it is feasible. Deferred.
+
+## 20 Sep 2026
+
+### The nightly window never fired, and the campaign ran during the day instead
+nightly.sh used a shell `sleep` until 23:00. The Mac was asleep at 23:00 Sat (pmset log shows it
+sleeping from ~21:39 with only dark wakes), and a sleeping shell does not count down, so the window
+slid to the next real wake: 13:03 Sun, when the author was using the machine. It ran the multi-turn
+Q3_K_M rung to completion (13:03-16:16) and 16 items of the budget control before I killed it at
+19:34. This is the exact heat the schedule was meant to avoid. Replaced with a launchd
+StartCalendarInterval job at 23:00 plus a pmset repeat wake at 22:58, so the machine wakes first
+and the job fires on the clock rather than on a sleeping process.
