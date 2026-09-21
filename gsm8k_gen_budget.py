@@ -38,7 +38,7 @@ if os.path.exists(OUT):
         except Exception: pass
 recs = [r for r in recs if r["id"] not in done]
 print(f"  resuming: {len(done)} done, {len(recs)} to go", flush=True)
-with open(OUT, "a") as f, ThreadPoolExecutor(4) as ex:
+with open(OUT, "a") as f, ThreadPoolExecutor(2) as ex:
     for i, res in enumerate(ex.map(one, recs), 1):
         f.write(json.dumps(res) + "\n"); f.flush()
         if i % 50 == 0: print(f"  {i}/400", flush=True)
