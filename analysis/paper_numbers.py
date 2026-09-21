@@ -243,3 +243,16 @@ except Exception as e:
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in mech.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"mechanism: {len(mech)} macros")
+
+# ============================================================ multi-turn length evidence
+mt = {}
+try:
+    for q, w in (("Q8_0", "Eight"), ("Q3_K_M", "Three")):
+        srv = (RUNS / "Qwen3-1.7B" / f"multi_turn_base-{q}.server.log").read_text()
+        ng = sorted(int(m) for m in re.findall(r"n_gen =\s*(\d+)", srv))
+        mt["MtNgenMed" + w] = ng[len(ng)//2]; mt["MtNgenPninezero" + w] = ng[int(.9*len(ng))]; mt["MtNgenReqs" + w] = len(ng)
+except Exception as e:
+    print("multi-turn length macros not ready:", e)
+with (TAB / "numbers.tex").open("a") as f:
+    for k, v in mt.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
+print(f"multi-turn length: {len(mt)} macros")
