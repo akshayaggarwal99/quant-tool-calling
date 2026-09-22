@@ -68,7 +68,7 @@ For \qm{} the answer is the reverse of the one we expected. Tool-calling accurac
 
 \paragraph{Free-form control.} The same five weight files answer 400 GSM8K test questions \citep{gsm8k2021}, drawn at seed 42, through the same server under the same alias, with a 4{,}096-token completion budget. Every generation is logged in full so that scoring under a different extractor is a re-read rather than a re-run. Two extractors were fixed before any rung was scored. Strict accepts an explicit commitment in any of three forms: ``The answer is $N$'', ``\#\#\#\# $N$'', or $\backslash$boxed$\{N\}$. Lenient takes the last number in the visible answer. We record that our first strict rule accepted only the first form and would have scored 21 of the first 59 generations wrong for writing the answer in a box; that rule was a strawman and was replaced before scoring, and the gap it would have produced is not reported anywhere in this paper.
 
-\paragraph{Larger model.} Qwen3-8B, same three rungs Q8\_0, Q4\_K\_M and Q3\_K\_M from its own FP16 source, on the first \qtNEightB{} questions of the same category in file order. \blocked{Qwen3-14B under the same protocol, queued.}
+\paragraph{Larger model.} Qwen3-8B, same three rungs Q8\_0, Q4\_K\_M and Q3\_K\_M from its own FP16 source, on the first \qtNEightB{} questions of the same category in file order, and Qwen3-14B under the identical protocol.
 
 \paragraph{Overthinking penalty.} \citet{lotfi2026overthink} report that a fixed logit penalty on a curated list of overthinking markers cuts chain-of-thought length by 12 to 23\% while preserving accuracy. We apply a fixed penalty of $-2.0$ to the eight Qwen3 tokens for \emph{wait}, \emph{but}, \emph{alternatively} and \emph{hmm} in both capitalisations, at the server, and re-run the \qm{} ladder at Q4\_K\_M and Q3\_K\_M. This approximates their method with a single fixed $\lambda$ rather than their tuned value.
 
@@ -123,15 +123,17 @@ The mechanism is in the last two columns of the table. At Q3\_K\_M, \qtGsmTruncT
 
 \paragraph{The extractor is not the story.} The gap between strict and lenient scoring is at most \qtGsmGapMax{} points at any rung. H3 predicted a gap of at least five points that would bound how much published free-form degradation is the parser. Once the strict extractor accepts the commitment format that reasoning models actually emit, no such gap exists. The failures at Q3\_K\_M are generations that contain no answer at all rather than answers a parser failed to find.
 
+\paragraph{Nor is the budget.} A collapse driven by truncation could be an artefact of the 4{,}096-token cap rather than of the weights. We re-ran the \qtBudOf{} Q3\_K\_M generations that hit the cap with a budget of 16{,}384 tokens, four times the original. Of the \qtBudN{} completed at the time of writing, \qtBudStillCap{} (\qtBudStillCapPct{}\%) hit the larger cap as well, and only \qtBudRecovered{} (\qtBudRecoveredPct{}\%) reached a correct answer. Given four times the room, the three-bit model mostly keeps thinking. The run-away is a property of the weights, and a larger budget converts most of the truncations into longer truncations. \blocked{Remaining budget-control items, running tonight; the two figures above update from the full set.}
+
 \subsection{Across models}
 \label{sec:models}
 
-Table~\ref{tab:models} adds Qwen3-8B at the three rungs that matter, and at 8B there is no cliff. Q3\_K\_M scores \qtAccEightBThree{}\% against \qtAccEightBEight{}\% at Q8\_0, a difference of \qtDeltaEightBThree{} points at $p=\qtPEightBThree{}$, and Q4\_K\_M is likewise indistinguishable from the baseline. On this family the three-bit floor that binds at 1.7B has moved below the ladder by 8B, which is the direction the free-form literature reports for larger models and is now shown for the call itself. \blocked{One sentence for Qwen3-14B when it lands.}
+Table~\ref{tab:models} adds Qwen3-8B at the three rungs that matter, and at 8B there is no cliff. Q3\_K\_M scores \qtAccEightBThree{}\% against \qtAccEightBEight{}\% at Q8\_0, a difference of \qtDeltaEightBThree{} points at $p=\qtPEightBThree{}$, and Q4\_K\_M is likewise indistinguishable from the baseline. Qwen3-14B repeats the pattern: \qtAccFourteenBEight{}\% at Q8\_0, \qtAccFourteenBFour{}\% at Q4\_K\_M and \qtAccFourteenBThree{}\% at Q3\_K\_M, with the Q3\_K\_M difference at \qtDeltaFourteenBThree{} points and $p=\qtPFourteenBThree{}$. On this family the three-bit floor that binds at 1.7B has moved below the ladder by 8B and stays there at 14B, which is the direction the free-form literature reports for larger models and is now shown for the call itself at two sizes.
 
 \begin{table}[t]
 \centering\small
 \input{tables/models.tex}
-\caption{Tool calling across model size, \texttt{simple\_python}. Qwen3-1.7B at $n=400$; Qwen3-8B at $n=\qtNEightB{}$. Each model is compared against its own Q8\_0.}
+\caption{Tool calling across model size, \texttt{simple\_python}. Qwen3-1.7B at $n=400$; Qwen3-8B and Qwen3-14B at $n=\qtNEightB{}$. Each model is compared against its own Q8\_0.}
 \label{tab:models}
 \end{table}
 
@@ -147,7 +149,7 @@ The penalty has no measurable effect. With it, \qm{} scores \qtHfourAccFour{}\% 
 
 \section{Limitations}
 
-Two models from one family, on the easiest \bfcl{} category plus one multi-turn set, on one hardware platform. The ladder is one quantization family; GPTQ, AWQ and the other research methods are deliberately out of scope, and multilingual degradation is excluded because it is already covered. The reproducibility control was run on two rungs rather than all five. The free-form control uses a 4{,}096-token budget, and the collapse at Q3\_K\_M is partly a property of that budget: a larger budget would recover some of the \qtGsmTruncThree{} truncated generations, though the \qtGsmFinishedDrop{}-point loss among finished generations would remain. The overthinking penalty is one fixed $\lambda$ rather than the authors' tuned value. Multi-turn is underpowered at $n=\qtMtN{}$ and a 17\% base rate. \blocked{Qwen3-14B and the Q3\_K\_M multi-turn rung.}
+Three sizes of one model family, on the easiest \bfcl{} category plus one multi-turn set, on one hardware platform. The ladder is one quantization family; GPTQ, AWQ and the other research methods are deliberately out of scope, and multilingual degradation is excluded because it is already covered. The reproducibility control was run on two rungs rather than all five. The free-form control uses a 4{,}096-token budget; the 16{,}384-token re-run in \S\ref{sec:freeform} shows that a larger budget recovers few of the \qtGsmTruncThree{} truncated generations, but the control is partial at the time of writing. The overthinking penalty is one fixed $\lambda$ rather than the authors' tuned value. Multi-turn is underpowered at $n=\qtMtN{}$ and a 17\% base rate. Three sizes of one model family are not a survey of families; a second family is the most valuable addition.
 
 \section{Conclusion}
 

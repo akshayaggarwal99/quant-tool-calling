@@ -256,3 +256,21 @@ except Exception as e:
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in mt.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"multi-turn length: {len(mt)} macros")
+
+# ============================================================ budget control (16K on the Q3_K_M truncations)
+bud = {}
+try:
+    from gsm8k_score import strict as gstrict, norm as gnorm
+    rows = [json.loads(l) for l in (RUNS / "gsm8k_budget" / "Q3_K_M_16k.jsonl").open()]
+    real = [r for r in rows if r.get("finish_reason") in ("stop", "length")]
+    fin = [r for r in real if r["finish_reason"] == "stop"]; cap = [r for r in real if r["finish_reason"] == "length"]
+    c = lambda rs: sum(gnorm(gstrict(r["content"])) == gnorm(r["gold"]) for r in rs)
+    bud["BudN"] = len(real); bud["BudFinished"] = len(fin); bud["BudStillCap"] = len(cap)
+    bud["BudStillCapPct"] = f"{100*len(cap)/max(1,len(real)):.0f}"
+    bud["BudRecovered"] = c(fin) + c(cap); bud["BudRecoveredPct"] = f"{100*(c(fin)+c(cap))/max(1,len(real)):.0f}"
+    bud["BudOf"] = 213
+except Exception as e:
+    print("budget macros not ready:", e)
+with (TAB / "numbers.tex").open("a") as f:
+    for k, v in bud.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
+print(f"budget: {len(bud)} macros")

@@ -229,3 +229,9 @@ starts scripts with a bare system PATH that does not include it. Fix: export PAT
 nightly.sh, plus a hand-rolled watchdog fallback if gtimeout is ever absent. Verified the bounded
 branch kills a process on schedule (exit 124). Reloaded the job. 14B FP16 pulled during the day so
 the download does not consume the window. Lesson: anything launchd runs needs an explicit PATH.
+
+### 22 Sep: the 02:00 window worked end to end
+Wake at 01:58, launchd at 02:00:03, gtimeout bounded it to 07:00. 14B resumed from its 100/200
+checkpoint and finished all three rungs by 03:38; budget control ran 03:38-07:00 and reached 66
+rows (62 real, 4 context errors even on 2 slots; acceptable). 14B: 96.00/96.00/96.50, p=1.000 at
+Q3. Budget: 50/62 still at the 16K cap, 13/62 correct. Tonight finishes the budget arm.

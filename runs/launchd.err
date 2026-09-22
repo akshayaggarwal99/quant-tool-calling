@@ -1,0 +1,2 @@
+/Users/akshay/Developer/research/o1a/tmlr-research/quant-tools/nightly.sh: line 16: 93870 Terminated: 15          gtimeout ${HOURS}h caffeinate -i ./run_all.sh >> runs/run_all.log 2>&1
+/Users/akshay/Developer/research/o1a/tmlr-research/quant-tools/nightly.sh: line 17: 13462 Terminated: 15          pkill -f run_model.sh
