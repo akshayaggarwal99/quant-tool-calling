@@ -235,3 +235,5 @@ Wake at 01:58, launchd at 02:00:03, gtimeout bounded it to 07:00. 14B resumed fr
 checkpoint and finished all three rungs by 03:38; budget control ran 03:38-07:00 and reached 66
 rows (62 real, 4 context errors even on 2 slots; acceptable). 14B: 96.00/96.00/96.50, p=1.000 at
 Q3. Budget: 50/62 still at the 16K cap, 13/62 correct. Tonight finishes the budget arm.
+
+### 23 Sep: window 3 clean, budget control 66 -> 136/213. ~70 items/night on 2 slots. One night left.
