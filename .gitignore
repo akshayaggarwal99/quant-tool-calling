@@ -10,3 +10,4 @@ out/
 *.fdb_latexmk
 paper/main.log
 paper/main.pdf
+paper/arxiv-v1.tar.gz

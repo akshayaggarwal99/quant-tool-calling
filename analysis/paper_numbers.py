@@ -274,3 +274,11 @@ except Exception as e:
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in bud.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"budget: {len(bud)} macros")
+
+# ============================================================ unsigned drops for prose ("loses X points")
+_n = (TAB / "numbers.tex").read_text()
+_drops = []
+for _m in re.finditer(r"\\newcommand\{\\qt(\w*?)Delta(\w+)\}\{([+-]?[\d.]+)\}", _n):
+    _drops.append(f"\\newcommand{{\\qt{_m.group(1)}Drop{_m.group(2)}}}{{{abs(float(_m.group(3))):.2f}}}\n")
+with (TAB / "numbers.tex").open("a") as f: f.writelines(_drops)
+print(f"drop macros: {len(_drops)}")
