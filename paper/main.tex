@@ -7,6 +7,7 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{url}
+\def\UrlBreaks{\do\/\do-\do.}
 \usepackage[hidelinks]{hyperref}
 \usepackage{natbib}
 \input{tables/numbers.tex}
@@ -158,7 +159,7 @@ Every number in this paper is a macro recomputed from the raw \bfcl{} result and
 \item \path{run_ladder.sh} rebuilds the ladder from the FP16 source and scores it; \path{run_model.sh} does the same for Qwen3-8B, Qwen3-14B and the multi-turn category.
 \item \path{run_repeats.sh}, \path{run_gsm8k.sh}, \path{run_budget.sh} and \path{run_h4.sh} produce the reproducibility, free-form, budget and penalty arms.
 \end{itemize}
-Code, run logs, raw generations and the pre-registration are at\\ \url{https://github.com/akshayaggarwal99/quant-tool-calling}, release tag \texttt{v1.0-paper}. The GGUF weight files are not in the repository; \path{run_ladder.sh} rebuilds them from the published FP16 checkpoint.
+Code, run logs, raw generations and the pre-registration are at \url{https://github.com/akshayaggarwal99/quant-tool-calling} (release tag \texttt{v1.0-paper}). The GGUF weight files are not in the repository; \path{run_ladder.sh} rebuilds them from the published FP16 checkpoint.
 
 \bibliographystyle{plainnat}
 \bibliography{refs}
