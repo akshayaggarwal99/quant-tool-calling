@@ -237,3 +237,8 @@ rows (62 real, 4 context errors even on 2 slots; acceptable). 14B: 96.00/96.00/9
 Q3. Budget: 50/62 still at the 16K cap, 13/62 correct. Tonight finishes the budget arm.
 
 ### 23 Sep: window 3 clean, budget control 66 -> 136/213. ~70 items/night on 2 slots. One night left.
+
+### 24 Sep: campaign complete
+Window 4 (02:00-04:22) finished the budget control: 213/213 rows. ALL_COMPLETE. Numbers regenerated
+from the full set; the "at the time of writing" hedges removed. launchd job unloaded. Every
+pre-registered arm has run: ladder, repeats, GSM8K, H4, 8B, 14B, multi-turn, budget control.
