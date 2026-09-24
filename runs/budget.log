@@ -1,0 +1,13 @@
+truncated at Q3_K_M: 213
+  resuming: 0 done, 213 to go
+truncated at Q3_K_M: 213
+  resuming: 0 done, 213 to go
+  50/400
+truncated at Q3_K_M: 213
+  resuming: 66 done, 147 to go
+  50/400
+truncated at Q3_K_M: 213
+  resuming: 136 done, 77 to go
+  50/400
+done runs/gsm8k_budget/Q3_K_M_16k.jsonl
+BUDGET_COMPLETE

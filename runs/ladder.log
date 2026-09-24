@@ -1,0 +1,21 @@
+[Q8_0] serving Qwen3-1.7B-Q8_0.gguf
+[Q8_0] generating: simple_python
+[Q8_0] evaluating
+[Q8_0] done -> runs/Q8_0
+[Q6_K] serving Qwen3-1.7B-Q6_K.gguf
+[Q6_K] generating: simple_python
+[Q6_K] evaluating
+[Q6_K] done -> runs/Q6_K
+[Q5_K_M] serving Qwen3-1.7B-Q5_K_M.gguf
+[Q5_K_M] generating: simple_python
+[Q5_K_M] evaluating
+[Q5_K_M] done -> runs/Q5_K_M
+[Q4_K_M] serving Qwen3-1.7B-Q4_K_M.gguf
+[Q4_K_M] generating: simple_python
+[Q4_K_M] evaluating
+[Q4_K_M] done -> runs/Q4_K_M
+[Q3_K_M] serving Qwen3-1.7B-Q3_K_M.gguf
+[Q3_K_M] generating: simple_python
+[Q3_K_M] evaluating
+[Q3_K_M] done -> runs/Q3_K_M
+LADDER_COMPLETE

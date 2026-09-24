@@ -1,0 +1,92 @@
+[Q8_0] generating GSM8K x400
+  50/400
+  100/400
+  150/400
+  200/400
+  250/400
+  300/400
+  350/400
+  400/400
+done runs/gsm8k/Q8_0.jsonl
+[Q8_0] done
+[Q6_K] generating GSM8K x400
+  50/400
+  100/400
+  150/400
+[Q8_0] done already
+[Q6_K] generating GSM8K x400
+  resuming: 150 done, 250 to go
+  50/400
+  100/400
+  150/400
+  200/400
+  250/400
+done runs/gsm8k/Q6_K.jsonl
+[Q6_K] done
+[Q5_K_M] generating GSM8K x400
+  resuming: 0 done, 400 to go
+  50/400
+  100/400
+  150/400
+  200/400
+  250/400
+  300/400
+  350/400
+  400/400
+done runs/gsm8k/Q5_K_M.jsonl
+[Q5_K_M] done
+[Q4_K_M] generating GSM8K x400
+  resuming: 0 done, 400 to go
+  50/400
+  100/400
+  150/400
+  200/400
+  250/400
+  300/400
+  350/400
+  400/400
+done runs/gsm8k/Q4_K_M.jsonl
+[Q4_K_M] done
+[Q3_K_M] generating GSM8K x400
+  resuming: 0 done, 400 to go
+  50/400
+  100/400
+  150/400
+  200/400
+  250/400
+  300/400
+  350/400
+  400/400
+done runs/gsm8k/Q3_K_M.jsonl
+[Q3_K_M] done
+GSM8K_COMPLETE
+[Q8_0] done already
+[Q6_K] done already
+[Q5_K_M] done already
+[Q4_K_M] done already
+[Q3_K_M] done already
+GSM8K_COMPLETE
+[Q8_0] done already
+[Q6_K] done already
+[Q5_K_M] done already
+[Q4_K_M] done already
+[Q3_K_M] done already
+GSM8K_COMPLETE
+[Q8_0] done already
+[Q6_K] done already
+[Q5_K_M] done already
+[Q4_K_M] done already
+[Q3_K_M] done already
+GSM8K_COMPLETE
+[Q8_0] done already
+[Q6_K] done already
+[Q5_K_M] done already
+[Q4_K_M] done already
+[Q3_K_M] done already
+GSM8K_COMPLETE
+[Q8_0] done already
+[Q6_K] done already
+[Q5_K_M] done already
+[Q4_K_M] done already
+[Q3_K_M] done already
+GSM8K_COMPLETE
