@@ -242,3 +242,11 @@ Q3. Budget: 50/62 still at the 16K cap, 13/62 correct. Tonight finishes the budg
 Window 4 (02:00-04:22) finished the budget control: 213/213 rows. ALL_COMPLETE. Numbers regenerated
 from the full set; the "at the time of writing" hedges removed. launchd job unloaded. Every
 pre-registered arm has run: ladder, repeats, GSM8K, H4, 8B, 14B, multi-turn, budget control.
+
+### 24 Sep: arXiv submission
+Review against a reference paper found one real gap: nine references. Added 13, each verified
+against its arXiv abstract page, and confirmed by full-text grep that the three broad quantization
+evaluations (Jin 2024, Li 2024, Liu 2025) contain no tool-calling benchmark, so the gap claim
+stands. Also caught "loses -4.75 points" (signed macro after "loses"); added unsigned Drop macros.
+Submitted as arXiv submit/8125878: cs.AI, cross-list cs.LG + cs.SE, CC BY 4.0. Bundle
+paper/arxiv-v1.tar.gz (tex, bbl, bib, tables, figure). Compiled clean on arXiv pdflatex, 9 pages.
