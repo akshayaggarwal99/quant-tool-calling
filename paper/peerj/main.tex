@@ -1,0 +1,272 @@
+% PeerJ Computer Science, Research Article. Built 29 Sep 2026 from ../main_tmlr.tex.
+% Format per https://peerj.com/about/author-instructions/cs (read 29 Sep 2026): US Letter, line
+% numbers, 2.5 cm margins, 12 point Times, left-justified text, Author Cover Page first, abstract
+% under 500 words, standard sections, declarations. A plain article class with those conventions;
+% the official Overleaf template requires a PeerJ login to download.
+\documentclass[12pt,letterpaper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{ragged2e}
+\usepackage[labelfont=bf,justification=RaggedRight,singlelinecheck=false]{caption}
+\usepackage[round,authoryear]{natbib}
+\usepackage{lineno}
+\usepackage[hidelinks]{hyperref}
+\input{../tables/numbers.tex}
+\newcommand{\bfcl}{BFCL}
+\newcommand{\qm}{Qwen3-1.7B}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt}
+\setlength{\bibsep}{4pt}
+\raggedbottom
+
+\title{Post-Training k-Quantization and Agentic Tool-Calling Accuracy on Five Qwen3 and Llama Models}
+\author{Akshay Kumar}
+\date{}
+
+\begin{document}
+\raggedright
+
+% ---------------------------------------------------------------- Author Cover Page
+\begin{titlepage}
+\vspace*{2cm}
+{\Large\bfseries Post-Training k-Quantization and Agentic Tool-Calling Accuracy on Five Qwen3 and Llama Models\par}
+\vspace{1.5cm}
+{\large Akshay Kumar$^{1}$\par}
+\vspace{0.5cm}
+$^{1}$ Independent Researcher\par
+\vspace{1cm}
+Corresponding author:\par
+Akshay Kumar$^{1}$\par
+Email address: akumar8@mt.iitr.ac.in\par
+ORCID: 0009-0006-3613-538X\par
+\vspace{1cm}
+Article type: Research Article\par
+Journal: PeerJ Computer Science\par
+\vfill
+\end{titlepage}
+
+\linenumbers
+\maketitle
+
+\begin{abstract}
+\textbf{Background.} Language models run on laptops after post-training quantization, and the format that ships is the llama.cpp k-quant. The accuracy cost of that compression has been measured on prose, knowledge and reasoning benchmarks, and not on the output an agent produces, which is a function call that a program then executes.
+
+\textbf{Methods.} We built a five-rung k-quant ladder, Q8\_0 to Q3\_K\_M, from one FP16 source for \qm{}, and three-rung ladders for Qwen3-8B, Qwen3-14B, Llama-3.2-3B and Llama-3.1-8B. Every rung was scored on the Berkeley Function Calling Leaderboard's \texttt{simple\_python} category by deterministic syntax-tree matching ($n=\qtN{}$ or \qtNEightB{}), with a type-coerced secondary score, and on \qtLlamaThreeBGsmN{} GSM8K questions with the same weight files. Rungs are compared with McNemar's exact test on identical items, every accuracy carries a Wilson 95\% interval, and two rungs were each run three times with nothing changed, to measure the instrument. The hypotheses were pre-registered before the first run.
+
+\textbf{Results.} On \qm{} tool calling is flat from Q8\_0 through Q4\_K\_M and loses \qtDropThree{} points at Q3\_K\_M ($p=\qtPThree{}$), about \qtCliffOverNoise{} times the run-to-run range. Free-form mathematics on those files loses \qtGsmDropThree{} points at that rung, because \qtGsmTruncThree{} of 400 generations reach the 4{,}096-token budget while still reasoning. Qwen3-8B and Qwen3-14B show no loss at any rung. Multi-turn tool calling on \qm{} falls from \qtMtAccEight{}\% to \qtMtAccThree{}\% at Q3\_K\_M. Llama-3.2-3B loses \qtDropLlamaThreeBFour{} points at Q4\_K\_M under the strict checker ($p=\qtPLlamaThreeBFour{}$) and \qtCoercedDropLlamaThreeBFour{} under the coerced one ($p=\qtCoercedPLlamaThreeBFour{}$). Llama-3.1-8B's strict score rises from \qtAccLlamaEightBEight{}\% at Q8\_0 to \qtAccLlamaEightBThree{}\% at Q3\_K\_M because its full-precision weights write numeric arguments as quoted strings; the coerced checker, which accepts a quoted value when it parses to what the reference holds, scores the same runs at \qtCoercedAccLlamaEightBEight{}\%, \qtCoercedAccLlamaEightBFour{}\% and \qtCoercedAccLlamaEightBThree{}\%. A fair answer extractor moves the free-form numbers by at most \qtGsmGapMax{} points, and a logit penalty on overthinking markers changes no tool-calling verdict.
+
+\textbf{Conclusions.} Four-bit k-quantization costs no detectable single-call accuracy on any of the five models once argument typing is separated from call correctness; three-bit costs \qm{} and Llama-3.1-8B measurable accuracy, and the other three models show no detectable loss. The length-driven collapse of chain-of-thought reasoning under three-bit weights does not reach a single tool call. A strict schema score can move in either direction under quantization because it also measures a formatting habit, so a coerced score belongs beside it.
+\end{abstract}
+
+\textbf{Keywords.} post-training quantization; llama.cpp; k-quant; tool calling; function calling; language model agents; BFCL; GSM8K; pre-registration
+
+\section{Introduction}
+
+A laptop runs \qm{} in its three-bit k-quant, Q3\_K\_M, as the model behind a small agent. The agent is asked to find the greatest common divisor of 36 and 48 and is handed one function to call, \texttt{number\_theory.gcd}. The same model at eight bits, Q8\_0, answers with the call \texttt{number\_theory.gcd(number1=36, number2=48)}. At three bits it answers with a sentence: ``The Greatest Common Divisor (GCD) of two numbers, say 36 and 48, is 24.'' The program waiting for a call receives prose, and the number in the prose is wrong as well; the answer is 12. Both outputs came from one FP16 weight file. Only the number of bits used to store each weight changed. This is item \texttt{simple\_python\_21} of the benchmark used below, one of \qtLostThree{} items the three-bit weights lose against the eight-bit weights, and the question of this paper is how often that happens, at which bit-width it starts, and whether the function call or the free-form reasoning breaks first.
+
+The compression is post-training quantization \citep{dettmers2022int8,gptq2023,awq2024}. The full-precision file for \qm{} is \qtSizeFp{}\,GB; the version most people would run, Q4\_K\_M, is \qtSizeFour{}\,GB, about \qtCompressFour{}\% of it. The format nearly everyone uses on a laptop is the family of llama.cpp k-quants \citep{llamacpp}, because that is what Ollama and the desktop front ends serve, and deployment surveys of language models on edge devices treat compression of this kind as a precondition for running them there at all \citep{dincer2026edge}. Four bits is where the scaling analysis says the trade-off is best \citep{dettmers2023case,kumar2024precision}, and it is the default most front ends pull. Lower bit-widths are pursued for throughput as well as size, although \citet{malekar2025amdahl} show that those gains are capped by whatever part of the model stays in higher precision.
+
+The cost of that compression has been measured with care, on tasks other than the one an agent performs. Broad evaluations cover language modelling, classification, knowledge, dialogue, long context and trustworthiness across many families \citep{jin2024comprehensive,li2024evaluating}; \citet{kurtic2024bf16} score the Llama-3.1 family under FP8, INT8 and INT4 on academic benchmarks and long-form tasks; \citet{lee2024tradeoffs} score instruction-tuned models from 1B to 405B under four quantization methods on thirteen datasets; multilingual degradation has its own study \citep{marchisio2024multilingual}; long-context inputs lose up to 59\% under four-bit methods \citep{mekala2025longcontext}; reasoning models have been quantized and scored on mathematics and code \citep{liu2025quanthurts}. \citet{kurt2026quant} quantizes Llama-3.1-8B-Instruct into thirteen GGUF formats and scores each on GSM8K, HellaSwag, IFEval, MMLU, TruthfulQA and perplexity. \citet{lotfi2026overthink} measure five reasoning models under GPTQ, AWQ and FlatQuant on mathematics, code and science questions and find accuracy falling as chain-of-thought inflates. Every task in every one of these papers is free-form or multiple choice. None involves emitting a function call.
+
+An agent calls tools \citep{patil2023gorilla,qin2023toolllm,yao2024taubench}. It emits a function name and a set of typed arguments that a program will execute. That output either passes the checker or it does not, with no partial credit and no reader to accept an approximate answer. Our starting intuition was that a function signature has none of the slack prose has, so compression should break tool calling at a higher bit-width than it breaks free-form accuracy. We pre-registered this as our first hypothesis before running anything.
+
+We built a controlled ladder, five k-quant formats produced from one FP16 source, and scored each rung on the Berkeley Function Calling Leaderboard \citep{bfcl2025}, which compares a model's call to a reference by deterministic abstract-syntax-tree matching; no model judges another model anywhere in the pipeline. We then ran each rung's file on a free-form control so that the two floors could be compared on identical parameters, repeated the three rungs that matter on four further models in two families, and re-scored every run under a checker that accepts a correctly valued argument in the wrong type.
+
+For \qm{} the answer is the reverse of the one we expected. Tool-calling accuracy is flat from Q8\_0 through Q4\_K\_M and falls by \qtDropThree{} points at Q3\_K\_M, roughly \qtCliffOverNoise{} times the run-to-run noise of the instrument. On those files free-form mathematics falls by \qtGsmDropThree{} points at the same rung. Both floors sit between four and three bits, but the drop in tool calling is about an eighth of the drop in mathematics. The difference comes down to output length. At three bits the model's chain of thought \citep{wei2022cot} grows until \qtGsmTruncPctThree{}\% of math generations use up their token budget before reaching an answer. A tool call is a median of \qtToolNgenMedThree{} tokens, so the weights never get the room to wander. On Qwen3-8B and Qwen3-14B there is no cliff at any rung. On the Llama family the picture is different, and part of the difference is the checker rather than the weights: Llama-3.2-3B loses at four bits under strict scoring and not under coerced scoring, and Llama-3.1-8B's strict score rises under compression because its full-precision weights quote numbers, a habit the compressed weights partly lose (\S\ref{sec:family}).
+
+\textbf{Contributions.} Each item names the table or figure that holds it.
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item A pre-registered, controlled k-quant ladder for tool calling: 5 rungs from one FP16 source on \qm{} ($n=\qtN{}$) and 3 rungs on 4 further models ($n=\qtNEightB{}$), scored by a deterministic checker and by a type-coerced secondary checker, with McNemar tests on identical items and Wilson 95\% intervals on every accuracy (\S\ref{sec:method}, Tables~\ref{tab:ladder} and~\ref{tab:models}).
+\item An instrument measurement most quantization papers omit: identical weights re-run 3 times move by at most \qtMaxRepRange{} points and flip at most \qtRepFlipsMaxFour{} of \qtN{} verdicts (Table~\ref{tab:repeats}).
+\item The \qm{} floor: no detectable loss down to Q4\_K\_M, then \qtDropThree{} points at Q3\_K\_M, $p=\qtPThree{}$, \qtLostThree{} lost against \qtGainedThree{} gained (Table~\ref{tab:ladder}); no loss at any rung on Qwen3-8B or Qwen3-14B (Table~\ref{tab:models}).
+\item The free-form comparison on the same weight files: \qtGsmDropThree{} points at Q3\_K\_M with \qtGsmTruncThree{} of 400 generations at the 4{,}096-token budget (Table~\ref{tab:gsm8k}, Figure~\ref{fig:ladder}); a 16{,}384-token re-run of those \qtBudOf{} items leaves \qtBudStillCapPct{}\% still at the cap.
+\item Multi-turn tool calling on \qm{}: \qtMtAccEight{}\% at Q8\_0 to \qtMtAccThree{}\% at Q3\_K\_M, $n=\qtMtN{}$, $p\qtMtPThree{}$ (Table~\ref{tab:multiturn}).
+\item A second family scored two ways: Llama-3.2-3B loses \qtDropLlamaThreeBFour{} points at Q4\_K\_M strict ($p=\qtPLlamaThreeBFour{}$) and \qtCoercedDropLlamaThreeBFour{} coerced ($p=\qtCoercedPLlamaThreeBFour{}$); Llama-3.1-8B gains \qtDropLlamaEightBThree{} strict points at Q3\_K\_M and loses \qtCoercedDropLlamaEightBThree{} coerced points ($p=\qtCoercedPLlamaEightBThree{}$), with \qtCoercibleLlamaEightBEight{} of its \qtFailsLlamaEightBEight{} Q8\_0 strict failures being quoted values of the right number (Tables~\ref{tab:models} and~\ref{tab:llama}).
+\item Two pre-registered nulls: a fair extractor changes free-form accuracy by at most \qtGsmGapMax{} points at any rung (Table~\ref{tab:gsm8k}), and a logit penalty on overthinking markers changes tool-calling accuracy by \qtHfourDropThree{} points at Q3\_K\_M (\S\ref{sec:penalty}).
+\end{enumerate}
+
+\section{Related work}
+
+\textbf{Quantization evaluated on free-form tasks.} The broad evaluations of post-training quantization score many model families on language modelling, multiple-choice knowledge, dialogue, long-context and trustworthiness tasks \citep{jin2024comprehensive,li2024evaluating}; a full-text search of both finds no tool-calling or function-calling benchmark. \citet{kurtic2024bf16} run more than half a million evaluations on the Llama-3.1 family under FP8, INT8 and INT4 and find well-tuned INT8 and INT4 weight-only formats close to lossless on their tasks; \citet{lee2024tradeoffs} find quantized models generally ahead of smaller full-precision ones but weaker on instruction following and hallucination detection. Neither scores a function call. \citet{liu2025quanthurts} quantize the DeepSeek-R1-distilled and QwQ reasoning models and find mathematics and code degrading under aggressive weight and KV-cache quantization, again on free-form tasks. \citet{kurt2026quant} is the closest work and the one this paper extends: one model, thirteen llama.cpp formats from Q3\_K\_S to Q8\_0 against FP16, six free-form or multiple-choice benchmarks, plus throughput and size. A full-text read finds no tool-calling, function-calling, agentic, structured-output or schema-compliance evaluation, and its conclusion asks for exactly what we add, additional model families and sizes under the same protocol. \citet{lotfi2026overthink} take a different axis, in the line of work on overthinking in reasoning models \citep{chen2024overthinking,sui2025stop}. Under GPTQ \citep{gptq2023}, AWQ \citep{awq2024} and FlatQuant, five reasoning models lose accuracy while emitting longer chains of thought, and in up to 52\% of failures the correct answer appears mid-trace without being committed to. Their compression methods are research methods rather than the k-quants that ship to laptops, and their failure categorisation, including the overthinking class, relies on GPT-5 as a judge. Whether chain-of-thought helps at all, and by how much, already varies by model and dataset at full precision \citep{hebenstreit2024cot}; what quantization does to its length is a further axis. Surveys of small language models for constrained settings list quantization among the standard optimisations and name tool use as a direction, without measuring the two together \citep{turkmen2026slm,dincer2026edge}.
+
+\textbf{Tool-calling evaluation.} Gorilla \citep{patil2023gorilla} and ToolLLM \citep{qin2023toolllm} established API calling as a benchmark task, and $\tau$-bench \citep{yao2024taubench} extends it to multi-turn agent-user interaction. \bfcl{} \citep{bfcl2025} scores a model's function call against a reference by abstract-syntax-tree matching over the function name, argument names, types and values, across single, multiple and parallel calls, an irrelevance category where no call is correct, and multi-turn trajectories. Because the matcher is deterministic, the same generation always receives the same verdict, so a difference between two rungs can be attributed to the weights rather than to the scorer. \citet{dondeti2026toolguard} study the same class of small models on consumer hardware from the safety side, scoring adversarial tool calls from seven models between 1B and 4B parameters with a deterministic would-dispatch rule; this paper is the accuracy side of the same deployment.
+
+\textbf{The gap.} Quantization has been scored on prose, knowledge, instruction following and reasoning, for research compression methods and for the deployed one. It has not been scored on tool calling under either. That is what we measure.
+
+\section{Materials and Methods}
+\label{sec:method}
+
+\subsection{Pre-registration}
+Hypotheses and thresholds were fixed on 18 September 2026 before the first grid run and are in \texttt{paper/preregistration.md} in the repository. Two full-text summaries of prior work were appended to that file during the first rung as documentation; no hypothesis or threshold changed after runs began.
+
+\subsection{Problem statement}
+\label{sec:problem}
+A \emph{ladder} for a model $M$ is an ordered list of weight files $r_0, r_1, \dots, r_K$ produced from one FP16 source with one quantizer, in decreasing bits per weight, so that the files differ in their weights and in nothing else. Here $r_0$ is always Q8\_0. An \emph{item set} $I$ is a fixed list of $n$ benchmark items with reference answers. A \emph{verdict} $v(i, r) \in \{0, 1\}$ is the deterministic output of a checker on the model's response to item $i$ served from rung $r$, and \emph{accuracy} $A(r)$ is the mean verdict over $I$. Two verdict functions are used for tool calling. The \emph{strict} verdict is \bfcl{}'s abstract-syntax-tree match. The \emph{coerced} verdict equals the strict verdict except that a strict failure is re-checked by the same checker after every string-typed argument whose schema declares a non-string type is replaced by its parsed value when it parses as that type, so a quoted number, list or boolean counts when the parsed value is what the reference holds and not otherwise. The coerced verdict is never below the strict one.
+
+Rungs are compared to $r_0$ pairwise on the same items. The test is McNemar's exact test on the discordant pairs \citep{mcnemar1947}: \emph{lost} counts items with $v(i, r_0)=1$ and $v(i, r)=0$, \emph{gained} the reverse, and $p$ is the two-sided exact binomial probability of a split at least that uneven under the null of no difference. Every accuracy carries a Wilson score 95\% interval, which is reported in square brackets. The \emph{cliff rung} $c(M)$ is the highest-precision rung $r_k$, $k \ge 1$, with $A(r_k) < A(r_0)$ and $p < 0.05$ against $r_0$. The \emph{floor} is the rung immediately above the cliff rung, the lowest-bit rung on the ladder with no detected loss. A model is \emph{flat} on the ladder when it has no cliff rung, so its floor is at or below the lowest rung measured. A detected loss must also exceed the \emph{instrument tolerance} $\tau$, the largest range in accuracy across three runs of identical weights and settings (\S\ref{sec:repro}); on this instrument $\tau = \qtMaxRepRange{}$ points, and every loss reported as a cliff below is at least \qtCliffOverNoise{} times larger. Item counts are $n=\qtN{}$ for the \qm{} ladder and both free-form arms, and $n=\qtNEightB{}$ for the other four models and for the multi-turn category. Every rung is a single run except the two \qm{} rungs used for the tolerance measurement, so a stranger who repeats one rung should expect its accuracy to move within $\tau$ and its verdicts on a few items to flip.
+
+Under these definitions the cliff rung is \qtCliffStrict{} for \qm{} under both verdicts, \qtCliffStrictEightB{} for Qwen3-8B and \qtCliffStrictFourteenB{} for Qwen3-14B (both flat), \qtCliffStrictLlamaThreeB{} strict and \qtCliffCoercedLlamaThreeB{} coerced for Llama-3.2-3B, and \qtCliffStrictLlamaEightB{} strict and \qtCliffCoercedLlamaEightB{} coerced for Llama-3.1-8B. The Results section gives the numbers behind each.
+
+\subsection{The ladder}
+Every rung of \qm{} \citep{qwen3} is produced from a single FP16 GGUF with \texttt{llama-quantize}. The formats are a subset of the ladder in \citet{kurt2026quant}, chosen to span the range at one rung per bit-width: Q8\_0, Q6\_K, Q5\_K\_M, Q4\_K\_M and Q3\_K\_M. Ollama's library publishes only two of these five for this model, Q8\_0 and Q4\_K\_M, alongside FP16, which is why the ladder is built rather than pulled. A Qwen3-4B rung was planned and dropped: \texttt{bfcl-eval} has no entry for the original Qwen3-4B, only for the later Instruct-2507 lineage, and mixing lineages would have confounded the size comparison. Four further models get the three rungs that turned out to matter, Q8\_0, Q4\_K\_M and Q3\_K\_M, each from its own FP16 source with the same quantizer: Qwen3-8B and Qwen3-14B from the same family, and Llama-3.2-3B-Instruct and Llama-3.1-8B-Instruct \citep{llama3} from a second family. The FP16 sources are the \texttt{*-fp16} blobs Ollama distributes. Per model the design is: \qm{}, 5 rungs, $n=\qtN{}$, with 3 runs at Q8\_0 and Q4\_K\_M; Qwen3-8B, Qwen3-14B, Llama-3.2-3B and Llama-3.1-8B, 3 rungs each, $n=\qtNEightB{}$, 1 run per rung. Both Llama models are instruction-tuned rather than reasoning-tuned, which is deliberate: it separates what the ladder does to a tool call from what it does to a chain of thought. Llama-3.1-8B-Instruct is also the model \citet{kurt2026quant} quantized, so the two ladders meet on one model.
+
+\subsection{Serving}
+Each rung is served by \texttt{llama-server} from llama.cpp 0.4.1 (Homebrew; build 10964, commit b29c606e2 for the binary in use at the time of writing) with full Metal offload on an Apple M1 Max with 64\,GB of memory, under a fixed model alias, so the harness sends identical requests to every rung. The single-call ladder and the repeats use four slots and an 8{,}192-token context; the free-form control, the larger models, the Llama models and the multi-turn runs use 32{,}768, because reasoning traces overflowed the smaller context; the 16{,}384-token budget re-run uses 65{,}536 with two slots. Generation is at temperature 0.001, the \texttt{bfcl-eval} default, for both arms. No sampling seed is fixed: \texttt{llama-server} is run with its default seed of $-1$, which draws a fresh random seed per request, so decoding is near-greedy but not bit-identical between runs. The repeat control below measures what that leaves. For the tool-calling arm, \texttt{bfcl-eval} 2026.3.23 builds the prompt itself in each model's own function-calling format and sends it to the server's raw completions endpoint, so the server's \texttt{-{}-jinja} chat template is not involved in those runs; the free-form arm uses the chat completions endpoint, where the template applies. Measured throughput is about \qtMacTg{} tokens per second per slot and \qtMacPp{} tokens per second of prompt evaluation. Python is 3.12.
+
+\subsection{Scoring}
+\bfcl{} v4 \citep{bfcl2025}, \texttt{simple\_python} category, deterministic AST matching, run through the \texttt{-FC} handler of each model so that the model uses its native function-calling format. The strict verdict is the checker's own. The coerced verdict is computed afterwards from the score files, with no new generation: each strict failure is passed back through \bfcl{}'s \texttt{simple\_function\_checker} with string arguments parsed to the type the function schema declares (\texttt{analysis/coerced.py} in the repository). A quoted integer is parsed only if it is an integer literal, a quoted list only if it parses as a list, a quoted boolean only if it is \texttt{true} or \texttt{false}; anything else is left as the string it was, and the checker then compares the parsed value with the reference exactly as it would a natively typed one, including nested types and optional parameters. The Qwen3 runs are unchanged by this re-score: \qtCoercibleQwenTotal{} of their \qtFailsQwenTotal{} strict failures across all rungs are of the coercible kind. Differences between rungs are tested with McNemar's exact test on the discordant pairs and every accuracy carries a Wilson 95\% interval, as defined in \S\ref{sec:problem}.
+
+\subsection{Reproducibility control}
+\label{sec:repro-method}
+Two rungs of \qm{}, Q8\_0 and Q4\_K\_M, were run three times each with nothing changed between runs. This gives the run-to-run variation of the instrument, which is needed before any difference between rungs can be read as a difference between weights. The control was run on the 1.7B model only; the other four models are single runs and inherit its tolerance as an assumption, which the Limitations section returns to.
+
+\subsection{Free-form control}
+The same five \qm{} weight files, and the three Llama files of each Llama model, answer 400 GSM8K test questions \citep{gsm8k2021}, drawn at seed 42, through the same server under the same alias, with a 4{,}096-token completion budget. Every generation is logged in full so that scoring under a different extractor is a re-read rather than a re-run. Two extractors were fixed before any rung was scored. Strict accepts an explicit commitment in any of three forms: ``The answer is $N$'', ``\#\#\#\# $N$'', or $\backslash$boxed$\{N\}$. Lenient takes the last number in the visible answer. We record that our first strict rule accepted only the first form and would have scored 21 of the first 59 generations wrong for writing the answer in a box; that rule was a strawman, it was replaced before scoring, and the gap it would have produced is not reported anywhere in this paper.
+
+\subsection{Check against the published leaderboard}
+\label{sec:sanity}
+Llama-3.1-8B-Instruct at Q8\_0 scores \qtAccLlamaEightBEight{}\% under the strict checker here, which is far below what the public leaderboard reports for that model, so the comparison is stated before the results. The \bfcl{} leaderboard data file \citep{bfclleaderboard2026}, last modified \qtBfclDataDate{} and retrieved on \qtBfclFetchDate{}, lists Llama-3.1-8B-Instruct in prompting mode only, as ``Llama-3.1-8B-Instruct (Prompt)'', at \qtBfclPromptPySimple{}\% on Python simple AST over the full 400 items; it lists no function-calling row for the model (\qtBfclLlamaFcRows{} of its \qtBfclLlamaRows{} Llama-3.1-8B rows). Our run uses the function-calling handler, in which \texttt{bfcl-eval} builds Meta's JSON tool-call prompt for Llama 3.1 itself and sends it to the raw completions endpoint of \texttt{llama-server}, with the tokenizer and configuration loaded from an ungated mirror of the same files because the \texttt{meta-llama} repositories are gated (\texttt{REMOTE\_OPENAI\_BASE\_URL} and \texttt{REMOTE\_OPENAI\_TOKENIZER\_PATH} in \texttt{run\_llama.sh}). In that format the full-precision model writes numeric arguments as quoted strings, which the strict checker rejects. The coerced score at Q8\_0, \qtCoercedAccLlamaEightBEight{}\% [\qtCoercedCiLlamaEightBEight{}] on the first \qtNEightB{} items, is consistent with the published prompting-mode number, so the gap between \qtAccLlamaEightBEight{}\% and \qtBfclPromptPySimple{}\% is the argument-typing habit under the JSON tool-call format, not the weights or the server. A cross-check of the same GGUF files on a second inference server has not been run.
+
+\subsection{Overthinking penalty}
+\citet{lotfi2026overthink} report that a fixed logit penalty on a curated list of overthinking markers cuts chain-of-thought length by 12 to 23\% while preserving accuracy. We apply a fixed penalty of $-2.0$ to the eight Qwen3 tokens for \emph{wait}, \emph{but}, \emph{alternatively} and \emph{hmm} in both capitalisations, at the server, and re-run the \qm{} ladder at Q4\_K\_M and Q3\_K\_M. This approximates their method with a single fixed $\lambda$ rather than their tuned value.
+
+\subsection{Reproducibility}
+Every number in this paper is a macro recomputed from the raw \bfcl{} result and score files and the logged generations; nothing is typed by hand. The scripts, all in the repository named in the Data Availability statement, are: \path{analysis/paper_numbers.py}, which writes \path{paper/tables/numbers.tex} and every table from \path{runs/}; \path{analysis/coerced.py}, the coerced re-score; \path{run_ladder.sh}, which rebuilds the \qm{} ladder from the FP16 source and scores it; \path{run_model.sh}, which does the same for Qwen3-8B, Qwen3-14B and the multi-turn category; \path{run_llama.sh} and \path{run_gsm8k_model.sh}, which build and score the two Llama models on both arms; and \path{run_repeats.sh}, \path{run_gsm8k.sh}, \path{run_budget.sh} and \path{run_h4.sh} for the reproducibility, free-form, budget and penalty arms. The GGUF weight files are not in the archive; \path{run_ladder.sh} and \path{run_model.sh} rebuild them from the published FP16 checkpoints.
+
+\section{Results}
+
+\subsection{The instrument is reproducible}
+\label{sec:repro}
+
+Table~\ref{tab:repeats} gives three runs of two rungs with nothing changed between them. Q8\_0 moved by \qtRepRangeEight{} points across three runs and Q4\_K\_M by \qtRepRangeFour{}. At the level of individual questions, at most \qtRepFlipsMaxEight{} of \qtN{} verdicts changed between two Q8\_0 runs and at most \qtRepFlipsMaxFour{} between two Q4\_K\_M runs. The instrument is close to deterministic, so any difference between rungs larger than about \qtMaxRepRange{} points can be attributed to the weights rather than to run-to-run variation.
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\input{../tables/repeats.tex}
+\caption{Run-to-run variation with nothing changed between runs, \qm{}, \texttt{simple\_python}, $n=\qtN{}$.}
+\label{tab:repeats}
+\end{table}
+
+\subsection{Flat to four bits, a cliff at three}
+\label{sec:ladder}
+
+Table~\ref{tab:ladder} is the ladder. From Q8\_0 down to Q4\_K\_M the accuracy sits in a band of under three points and no rung differs from Q8\_0 at any conventional level: Q4\_K\_M is at \qtAccFour{}\% [\qtCiFour{}] against Q8\_0's \qtAccEight{}\% [\qtCiEight{}], a difference of \qtDeltaFour{} points with a McNemar $p$ of \qtPFour{}, while being \qtSizeRatioFour{}\% of the file size. Q6\_K scores above Q8\_0 and Q5\_K\_M below it, and neither difference survives paired testing, so the apparent non-monotonicity in the raw numbers is within the instrument's noise.
+
+Q3\_K\_M is a different case. It loses \qtLostThree{} questions that Q8\_0 gets right and recovers \qtGainedThree{}, a net loss of \qtDropThree{} points at $p=\qtPThree{}$. That drop is about \qtCliffOverNoise{} times the largest run-to-run range in Table~\ref{tab:repeats}, which places the tool-calling floor for this model at Q4\_K\_M and the cliff rung at Q3\_K\_M. Most of the \qtLostThree{} lost items are calls with a wrong argument value; the rest are prose in place of a call, as in the GCD item of the introduction, or a wrong function name.
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\input{../tables/ladder.tex}
+\caption{The quantization ladder for \qm{} on \texttt{simple\_python}, $n=\qtN{}$ per rung, all rungs from one FP16 source, one run per rung. Brackets are Wilson 95\% intervals. Lost and gained count questions that flip against Q8\_0; $p$ is McNemar's exact test on those discordant pairs, in bold where below 0.05.}
+\label{tab:ladder}
+\end{table}
+
+\subsection{The free-form floor on the same weights}
+\label{sec:freeform}
+
+Figure~\ref{fig:ladder} puts both tasks on one axis and Table~\ref{tab:gsm8k} gives the numbers. The tool-calling line barely moves while the free-form line drops sharply at the same rung, and the right panel shows the reason. The free-form floor sits exactly where the tool-calling floor sits, at Q4\_K\_M, and nowhere else: no rung above Q3\_K\_M differs from Q8\_0 under paired testing. So H1 as pre-registered fails, and it fails in the opposite direction. At Q3\_K\_M free-form accuracy falls by \qtGsmDropThree{} points, against \qtDropThree{} for tool calling. The output with no slack is the one that holds up.
+
+The mechanism is in the last two columns of the table. At Q3\_K\_M, \qtGsmTruncThree{} of 400 generations hit the 4{,}096-token completion budget while still inside the chain of thought and never emit an answer. The median completion length at this rung is the budget itself. This is the behaviour \citet{lotfi2026overthink} report under GPTQ and AWQ, reproduced here on the deployed format with a deterministic scorer. Among the \qtGsmFinishedNThree{} generations that did finish, accuracy is \qtGsmFinishedAccThree{}\%, against \qtGsmFinishedAccEight{}\% for finished generations at Q8\_0, so a smaller reasoning loss of about \qtGsmFinishedDrop{} points sits underneath the collapse. A tool call does not pay that cost. At Q3\_K\_M the median tool-call generation is \qtToolNgenMedThree{} tokens, the 90th percentile \qtToolNgenPninezeroThree{}, and \qtToolNgenCapThree{} of \qtToolNgenReqsThree{} requests came near the budget. The generation ends before the same instability has room to develop.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../figures/fig1-ladder.pdf}
+\caption{(a) Accuracy across the quantization ladder on identical weight files: tool calling on \bfcl{} and free-form mathematics on GSM8K for \qm{}, with Qwen3-8B tool calling dashed. Both floors sit at Q4\_K\_M; the free-form drop at Q3\_K\_M is about eight times the tool-calling drop. (b) Cumulative distribution of completion length at Q8\_0 and Q3\_K\_M for each task. Tool calls are short at both rungs, while math generations at Q3\_K\_M pile up against the 4{,}096-token budget and \qtGsmTruncThree{} of 400 never finish.}
+\label{fig:ladder}
+\end{figure}
+
+\begin{table}[t]
+\centering\footnotesize\setlength{\tabcolsep}{3.5pt}
+\input{../tables/gsm8k.tex}
+\caption{The free-form control, GSM8K, \qm{}, $n=400$ per rung, identical weight files to Table~\ref{tab:ladder}. Brackets are Wilson 95\% intervals on the strict score. Extractor gap is lenient minus strict. Median tokens is the completion length; the budget was 4{,}096.}
+\label{tab:gsm8k}
+\end{table}
+
+\textbf{The extractor.} The gap between strict and lenient scoring is at most \qtGsmGapMax{} points at any rung. H3 predicted a gap of at least five points that would bound how much published free-form degradation is the parser. Once the strict extractor accepts the commitment format that reasoning models actually emit, no such gap exists. The failures at Q3\_K\_M are generations that contain no answer at all rather than answers a parser failed to find.
+
+\textbf{The budget.} A collapse driven by truncation could be an artefact of the 4{,}096-token cap rather than of the weights. We re-ran the \qtBudOf{} Q3\_K\_M generations that hit the cap with a budget of 16{,}384 tokens, four times the original. Of the \qtBudN{} that completed without a server error, \qtBudStillCap{} (\qtBudStillCapPct{}\%) hit the larger cap as well, and \qtBudRecovered{} (\qtBudRecoveredPct{}\%) reached a correct answer. Given four times the room, the three-bit model mostly keeps thinking. A larger budget converts most of the truncations into longer truncations.
+
+\subsection{Across models, strict and coerced}
+\label{sec:models}
+
+Table~\ref{tab:models} gives every model at the three rungs that matter, under both verdicts. On Qwen3-8B there is no cliff. Q3\_K\_M scores \qtAccEightBThree{}\% [\qtCiEightBThree{}] against \qtAccEightBEight{}\% [\qtCiEightBEight{}] at Q8\_0, a difference of \qtDeltaEightBThree{} points at $p=\qtPEightBThree{}$, and Q4\_K\_M is likewise indistinguishable from the baseline. Qwen3-14B repeats the pattern: \qtAccFourteenBEight{}\% at Q8\_0, \qtAccFourteenBFour{}\% at Q4\_K\_M and \qtAccFourteenBThree{}\% at Q3\_K\_M, with the Q3\_K\_M difference at \qtDeltaFourteenBThree{} points and $p=\qtPFourteenBThree{}$. On this family the three-bit cliff that binds at 1.7B has moved below the ladder by 8B and stays there at 14B, which is the direction the free-form literature reports for larger models and is now shown for the call itself at two sizes. The coerced columns for the three Qwen3 models are identical to the strict ones, because none of their strict failures is a quoted value of the right type. Both Llama models are single runs at $n=\qtNEightB{}$, and their intervals are correspondingly wider than the 1.7B ones.
+
+\begin{table}[t]
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\input{../tables/models.tex}
+\caption{Tool calling across five models on \texttt{simple\_python}, under the strict \bfcl{} verdict and the type-coerced verdict of \S\ref{sec:problem}. \qm{} at $n=\qtN{}$; the other four at $n=\qtNEightB{}$, one run per rung. Brackets are Wilson 95\% intervals. Each model is compared against its own Q8\_0 by McNemar's exact test; $p$ in bold where below 0.05.}
+\label{tab:models}
+\end{table}
+
+\subsection{A second family}
+\label{sec:family}
+
+The Qwen3 pattern does not transfer to the Llama models, and the two verdicts disagree about how much of what happens is capability. Under the strict checker Llama-3.2-3B loses \qtDropLlamaThreeBFour{} points at Q4\_K\_M ($p=\qtPLlamaThreeBFour{}$, \qtLostLlamaThreeBFour{} lost against \qtGainedLlamaThreeBFour{} gained) and \qtDropLlamaThreeBThree{} at Q3\_K\_M ($p=\qtPLlamaThreeBThree{}$), so under strict scoring its cliff rung is Q4\_K\_M. Under the coerced checker the same runs lose \qtCoercedDropLlamaThreeBFour{} and \qtCoercedDropLlamaThreeBThree{} points, at $p=\qtCoercedPLlamaThreeBFour{}$ and $p=\qtCoercedPLlamaThreeBThree{}$, and the model has no cliff rung on the ladder. The difference is in Table~\ref{tab:llama}: of its strict failures, \qtCoercibleLlamaThreeBEight{} at Q8\_0, \qtCoercibleLlamaThreeBFour{} at Q4\_K\_M and \qtCoercibleLlamaThreeBThree{} at Q3\_K\_M are the right value in a quoted string, so the strict loss overstates the loss in call correctness: \qtDropLlamaThreeBFour{} against \qtCoercedDropLlamaThreeBFour{} points at Q4\_K\_M and \qtDropLlamaThreeBThree{} against \qtCoercedDropLlamaThreeBThree{} at Q3\_K\_M, the remainder being a change in how the compressed weights type their arguments.
+
+Llama-3.1-8B is the extreme case. Its Q8\_0 weights score \qtAccLlamaEightBEight{}\% under the strict checker; Q4\_K\_M and Q3\_K\_M score \qtAccLlamaEightBFour{}\% and \qtAccLlamaEightBThree{}\%, both at $p<0.0001$ against Q8\_0, an inversion of the expected order. Table~\ref{tab:llama} gives the reason. Of the \qtFailsLlamaEightBEight{} Q8\_0 strict failures, \qtTypeErrLlamaEightBEight{} are type errors, and \qtCoercibleLlamaEightBEight{} of those pass the checker once the quoted value is parsed: the model names the right function and the right value and writes the number in quotes, as in \texttt{\{"base": "10", "height": "5"\}} for a triangle with base 10 and height 5. At Q3\_K\_M only \qtCoercibleLlamaEightBThree{} of \qtFailsLlamaEightBThree{} failures are of that kind, while decode failures, where the output does not parse as a call at all, rise from \qtDecodeErrLlamaEightBEight{} to \qtDecodeErrLlamaEightBThree{}. The coerced column of Table~\ref{tab:models} restores the expected order: \qtCoercedAccLlamaEightBEight{}\% [\qtCoercedCiLlamaEightBEight{}], \qtCoercedAccLlamaEightBFour{}\% [\qtCoercedCiLlamaEightBFour{}] and \qtCoercedAccLlamaEightBThree{}\% [\qtCoercedCiLlamaEightBThree{}] down the ladder, no detectable loss at Q4\_K\_M ($p=\qtCoercedPLlamaEightBFour{}$) and a \qtCoercedDropLlamaEightBThree{}-point loss at Q3\_K\_M ($p=\qtCoercedPLlamaEightBThree{}$). So the compressed 8B weights write bare numbers more often, which raises the strict score, while the underlying call holds at four bits and gets worse at three. Free-form accuracy on the same files falls \qtLlamaEightBGsmDropFour{} points at Q4\_K\_M and \qtLlamaEightBGsmDropThree{} at Q3\_K\_M. Length plays no part in either Llama model: GSM8K completions have a median of \qtLlamaThreeBGsmMedTokEight{} to \qtLlamaEightBGsmMedTokEight{} tokens, and at most \qtLlamaEightBGsmTruncThree{} of 400 reach the budget at any rung, so the run-away behind the Qwen3 collapse cannot occur and the free-form losses here are ordinary precision loss.
+
+What the second family adds is one finding and one warning. The finding is that quantization changes argument typing before it changes call correctness: on both Llama models the count of coercible failures moves with the rung while the coerced accuracy at Q4\_K\_M does not differ from Q8\_0. The warning is that a strict schema score can move in either direction under quantization, because it measures a formatting habit as much as a capability, and a reader given only the strict column of Table~\ref{tab:models} would conclude that compressing Llama-3.1-8B improves it. Anyone scoring tool calls under compression should report the failure types and a coerced score beside the strict one.
+
+\begin{table}[t]
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\input{../tables/llama_failures.tex}
+\caption{The second family. Failure types on \texttt{simple\_python} ($n=\qtNEightB{}$ per rung, one run): strict failures, of which type errors and decode failures, and the number of strict failures that pass the coerced checker. GSM8K strict accuracy, $n=400$, with Wilson 95\% intervals, each model against its own Q8\_0 by McNemar's exact test.}
+\label{tab:llama}
+\end{table}
+
+\subsection{Multi-turn trajectories}
+\label{sec:multiturn}
+
+The pre-registration predicted that multi-turn trajectories, where an error in one call corrupts the state for every call after it, would degrade at least twice as fast as single calls. They degrade far faster than that. Table~\ref{tab:multiturn} gives \bfcl{}'s \texttt{multi\_turn\_base} on \qm{}, $n=\qtMtN{}$: \qtMtAccEight{}\% at Q8\_0, \qtMtAccFour{}\% at Q4\_K\_M and \qtMtAccThree{}\% at Q3\_K\_M. The Q4\_K\_M drop is \qtMtRelFour{}\% relative against \qtSingleRelFour{}\% for single calls at the same rung, in the predicted direction and not significant at this $n$ ($p=\qtMtPFour{}$). The Q3\_K\_M drop is \qtMtRelThree{}\% relative against \qtSingleRelThree{}\% for single calls, at $p\qtMtPThree{}$, with \qtMtLostThree{} trajectories lost and \qtMtGainedThree{} gained. H5 is supported at three bits by a wide margin.
+
+The size of the multi-turn collapse follows from \S\ref{sec:freeform}. A single call is a short generation and survives three-bit weights because it ends before the length instability has room to develop. A multi-turn trajectory is many generations in sequence, each conditioned on the accumulated state, so the same per-step failure rate compounds and a single malformed call anywhere in the sequence fails the whole trajectory. The server logs show the instability reaching the call once calls are chained: at Q3\_K\_M the median generation per request is \qtMtNgenMedThree{} tokens against \qtMtNgenMedEight{} at Q8\_0, and the 90th percentile \qtMtNgenPninezeroThree{} against \qtMtNgenPninezeroEight{}. Weights that keep a single call to \qtToolNgenMedThree{} tokens let a conditioned call run more than twice as long, and the extra length is the run-away from \S\ref{sec:freeform}, now with a schema to break. The low absolute base rate, \qtMtAccEight{}\% even at Q8\_0, is a property of the category for a 1.7B model and is why the Q4\_K\_M comparison is underpowered; it does not affect the Q3\_K\_M conclusion.
+
+\begin{table}[t]
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\input{../tables/multiturn.tex}
+\caption{Multi-turn tool calling, \bfcl{} \texttt{multi\_turn\_base}, \qm{}, $n=\qtMtN{}$ per rung, one run. Brackets are Wilson 95\% intervals. Relative is the change against Q8\_0 as a fraction of the Q8\_0 accuracy; the last column is the same quantity for single calls at that rung (Table~\ref{tab:ladder}).}
+\label{tab:multiturn}
+\end{table}
+
+\subsection{Does the overthinking penalty transfer}
+\label{sec:penalty}
+
+The penalty has no measurable effect. With it, \qm{} scores \qtHfourAccFour{}\% at Q4\_K\_M and \qtHfourAccThree{}\% at Q3\_K\_M, identical to the unpenalised runs to two decimals; at each rung \qtHfourLostFour{} questions flip one way and \qtHfourGainedFour{} the other. H4 predicted a loss of at least three points and there is no loss. The explanation follows from \S\ref{sec:freeform}: the penalty acts on tokens a reasoning trace emits and a tool call does not, so on a \qtToolNgenMedThree{}-token output there is almost nothing for it to act on. This agrees with the authors' own scope statement that the marker list was curated for free-form English reasoning. Both the failure they describe and the fix for it live in the reasoning trace, and the tool call contains very little of that trace.
+
+\section{Discussion}
+
+Three of the five pre-registered hypotheses did not hold, and the paper reports them as they fell. H1, that the schema would break first, reversed. H3, that the answer extractor would account for at least five points of published free-form degradation, found a gap of at most \qtGsmGapMax{} points once the extractor accepted the format reasoning models emit. H4, that the overthinking penalty would cost schema compliance, found a change of \qtHfourDropThree{} points. H2, on the failure-mode shift, is answered partly by the Llama failure types in Table~\ref{tab:llama}, where decode failures on Llama-3.1-8B rise from \qtDecodeErrLlamaEightBEight{} to \qtDecodeErrLlamaEightBThree{} across the ladder, and H5, on multi-turn amplification, held by a wide margin.
+
+The tool-calling floor is a property of the model, not of the format. Four bits costs nothing detectable on any of the five models once argument typing is separated from call correctness; three bits costs \qm{} \qtDropThree{} points and Llama-3.1-8B \qtCoercedDropLlamaEightBThree{} coerced points, and costs Qwen3-8B, Qwen3-14B and Llama-3.2-3B nothing detectable at these sample sizes. The mechanism that damages free-form reasoning at three bits on Qwen3, a chain of thought that runs past its budget, does not reach a single tool call because the call is over long before the run-away starts, and it does reach a multi-turn trajectory because chained calls grow long enough for it to start.
+
+On the measurement itself, two things we would tell another group. First, report the failure types. The Llama-3.1-8B inversion in the strict column of Table~\ref{tab:models} would read as a broken harness to anyone who did not see Table~\ref{tab:llama}, and it took a re-score of the existing files, not a new run, to show that \qtCoercibleLlamaEightBEight{} of \qtFailsLlamaEightBEight{} failures were the right number in quotes. Second, measure the instrument. Three runs with nothing changed moved by at most \qtMaxRepRange{} points (Table~\ref{tab:repeats}); without that figure, none of the other differences in this paper could be attributed to anything.
+
+\textbf{Practical reading.} For anyone deploying an agent on a laptop: four bits is safe for single calls on every model measured here, three bits is not on \qm{} or Llama-3.1-8B, the bit-width should be measured on the model being shipped rather than assumed from another family, and a strict schema score should be read together with a coerced one. A model that emits malformed or wrong tool calls can take real actions, so the multi-turn collapse at three bits in \S\ref{sec:multiturn} is a reason to test agents at the exact quantization they ship with.
+
+\textbf{Limitations.} Three sizes of one model family and two sizes of a second, on the easiest \bfcl{} category plus one multi-turn set for \qm{} only, on one hardware platform and one inference server. The ladder is one quantization family; GPTQ, AWQ and the other research methods are deliberately out of scope, and multilingual degradation is excluded because \citet{marchisio2024multilingual} already cover it. The reproducibility control was run on two rungs of one model rather than on every rung of every model, so the tolerance of \qtMaxRepRange{} points is measured on \qm{} and assumed for the other four; the Llama-3.2-3B strict result at Q4\_K\_M rests on \qtLostLlamaThreeBFour{} lost against \qtGainedLlamaThreeBFour{} gained from a single run, and a repeat on that model is the first thing we would add. Four of the five models were scored on the first \qtNEightB{} items of the category, which halves their power relative to the 1.7B ladder. The free-form control uses a 4{,}096-token budget; the 16{,}384-token re-run shows that a larger budget recovers few of the \qtGsmTruncThree{} truncated generations. The Llama-3.1-8B typing habit was diagnosed from the score files and by comparison with the published prompting-mode number, not by re-running the weights on a second server. The overthinking penalty is one fixed $\lambda$ rather than the authors' tuned value. Multi-turn is underpowered at $n=\qtMtN{}$ and a 17\% base rate, and was not run on Llama. A repeat control on the Llama models, a third family, and the multi-turn category on Llama are the next additions.
+
+\section{Conclusions}
+
+We expected a function signature, having no slack, to be the first thing quantization breaks. On the deployed format, scored deterministically, it was the output that held up best. For \qm{} the tool-calling floor and the free-form floor sit at the same rung, Q4\_K\_M, but the call loses \qtDropThree{} points at Q3\_K\_M where the mathematics loses \qtGsmDropThree{}, and the difference is length: three-bit weights make the chain of thought grow past the token budget, and a call is complete long before that happens. On Qwen3-8B and Qwen3-14B there is no tool-calling cliff at any rung. On the Llama family the strict score moves in both directions because compression changes how the models type their arguments; scored on the parsed value, four bits costs neither Llama model detectable accuracy and three bits costs Llama-3.1-8B \qtCoercedDropLlamaEightBThree{} points. A fair extractor changes nothing, and a penalty designed for reasoning traces finds little to act on in a call. The bit-width an agent can tolerate has to be measured on the model being shipped, and the damage quantization does to long reasoning does not carry over to the tool call.
+
+\section*{Additional Information and Declarations}
+
+\textbf{Competing Interests.} The author declares that there are no competing interests. The author has no financial or other interest in any of the models, quantization tools, benchmarks or inference servers evaluated, and none of their developers was involved in the study.
+
+\textbf{Author Contributions.} Akshay Kumar conceived and designed the experiments, performed the experiments, analyzed the data, prepared figures and tables, authored and reviewed drafts of the article, and approved the final draft.
+
+\textbf{Funding.} The author received no funding for this work. All computation ran on the author's own hardware.
+
+\textbf{Data Availability.} The code, run scripts, every raw \bfcl{} result and score file, every GSM8K generation, the server logs, the pre-registration and the dated lab notebook are available at \url{https://github.com/akshayaggarwal99/quant-tool-calling} under the MIT licence, at the release tag \texttt{v1.2-peerj}, which is the version this paper describes, and are archived at Zenodo under DOI 10.5281/zenodo.XXXXXXX. The GGUF weight files are not included; the scripts rebuild them from the published FP16 checkpoints.
+
+\bibliographystyle{plainnat}
+\bibliography{../refs}
+\end{document}

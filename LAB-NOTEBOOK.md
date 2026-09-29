@@ -277,3 +277,85 @@ simple_python n=200: Q8_0 92.0, Q4_K_M 88.0, Q3_K_M 86.5 (raw, unpaired; McNemar
 Q8_0 reached 240/400, all finish_reason=stop, median 187 tokens. Window overran to 08:03 because
 gtimeout does not count sleep; killed by hand. nightly.sh rewritten: caffeinate -i -s, real-clock
 watchdog, absolute STOP_AT=07:30. Wake timer still needed: sudo pmset repeat wakeorpoweron MTWRFSU 01:58:00.
+
+### 27 Sep: Llama arm complete (recorded 29 Sep)
+
+Window of 02:00-04:17 on 27 Sep finished both Llama models on both arms with no errors or truncations
+in the BFCL runs. Committed and tagged v1.1-second-family on 29 Sep with the TMLR-format manuscript.
+
+## 29 Sep 2026 — PeerJ Computer Science version
+
+### Coerced score re-derived with BFCL's own checker; numbers changed
+
+The 27 Sep coerced re-score in paper_numbers.py used a regular expression over the checker's error
+string: any type_error whose quoted value parsed as a number, list or boolean counted as correct. That
+rule does not check the parsed value against the reference and it stops at the first error the
+checker reported, so it over-counted. Replaced by analysis/coerced.py: each strict failure is passed
+back through bfcl_eval's simple_function_checker with string arguments parsed to the schema's type
+(integer literal, float, true/false, list or dict literal); anything else stays a string. The checker
+then does what it would do for a natively typed value, including nested types, optional parameters and
+value matching. Llama-3.1-8B coerced moves from 94.00 / 93.00 / 87.00 to 92.00 / 90.50 / 85.00 at
+Q8_0 / Q4_K_M / Q3_K_M (coercible failures 84 / 55 / 27 of 100 / 74 / 57); Llama-3.2-3B stays at
+93.50 / 91.00 / 91.00. Items the regex accepted and the checker rejects are, for example,
+simple_python_122 (alpha "0" where the reference wants 0.05) and simple_python_13 (a quoted "[1, 3]"
+where the schema wants an array of floats, which BFCL rejects for a natively typed [1, 3] as well).
+The Qwen3 runs have 0 coercible failures out of 226, so their coerced columns equal strict. The
+planning note's expected values of 78.0 / 78.0 / 76.0 for Llama-3.1-8B could not be reproduced under
+any rule tried (numeric-only strings give 74.0 at Q8_0; numeric plus arrays plus booleans give 94.5 by
+regex); the checker-based rule is the one the paper now states and uses. Coerced McNemar vs Q8_0:
+3B Q4 p=0.125, Q3 p=0.180 (no cliff under the coerced verdict); 8B Q4 p=0.453, Q3 p=0.003.
+
+Wilson 95% intervals added to every accuracy cell; cliff-rung macros (highest-precision rung with a
+loss at p<0.05) computed per model and verdict; a multi-turn table with lost/gained (16/9 at Q4,
+32/1 at Q3). Tables regenerate from analysis/paper_numbers.py; main_tmlr.tex still compiles against
+them (llama.tex keeps its old layout, the failure-type table is llama_failures.tex).
+
+### Llama-3.1-8B Q8_0 = 50.0% against the published BFCL number
+
+The public leaderboard (gorilla.cs.berkeley.edu, BFCL V4; data_non_live.csv last modified 13 Apr 2026,
+fetched 29 Sep, stored in analysis/bfcl_leaderboard/) lists Llama-3.1-8B-Instruct only in prompting
+mode, "Llama-3.1-8B-Instruct (Prompt)", at 94.00% on Python simple AST (n=400), non-live overall
+84.00%. There is no FC row for the model. Our run uses the FC handler (LlamaHandler_3_1): bfcl-eval
+builds Meta's JSON tool-call prompt itself and sends it to llama-server's raw /v1/completions
+endpoint, so --jinja is not in the path for the BFCL runs (it is for the GSM8K arm, which uses chat
+completions); tokenizer and config come from unsloth/Llama-3.1-8B-Instruct via REMOTE_OPENAI_BASE_URL
+and REMOTE_OPENAI_TOKENIZER_PATH. Under that format the full-precision model writes numbers as quoted
+strings. Strict 50.0% vs published 94.0% is a 44-point gap; coerced 92.0% [87.4, 95.0] on the first
+200 items is consistent with the published prompting-mode number. Reading: the discrepancy is the
+argument-typing habit under the JSON tool-call format, not the weights or the server.
+DECISION LINE FOR THE AUTHOR: a vLLM (or second-server) cross-check of Llama-3.1-8B Q8_0 in FC mode
+is [ ] not needed, the coerced score settles it / [ ] needed before submission. The paper currently
+says the cross-check has not been run.
+
+Sampling policy recorded: BFCL and gsm8k_gen.py both send temperature 0.001; no seed is sent; the
+llama-server binary reports version 0.4.1 (build 10964, commit b29c606e2) and its default seed is -1,
+a fresh random seed per request. The three-run repeat control is what bounds the effect.
+
+### PeerJ build
+
+paper/peerj/main.tex written from main_tmlr.tex: 12 pt Times, US Letter, 2.5 cm margins, lineno,
+left-justified, Author Cover Page first (Akshay Kumar, Independent Researcher, akumar8@mt.iitr.ac.in,
+ORCID 0009-0006-3613-538X), structured abstract of 376 words, keywords, Materials and Methods with a
+Problem statement subsection (ladder, verdicts, cliff rung, floor, flat, tolerance tau=0.50 pp,
+n per model, single-run labels), a "Check against the published leaderboard" subsection, Results with
+strict and coerced columns for all five models (Table 4), the Llama failure-type table (Table 5), the
+multi-turn table (Table 6, section labelled sec:multiturn), Discussion with the practical reading
+pointing at the multi-turn section, Limitations, Conclusions, and a declarations block (Competing
+Interests, Author Contributions, Funding, Data Availability with a Zenodo DOI placeholder and tag
+v1.2-peerj). Title: "Post-Training k-Quantization and Agentic Tool-Calling Accuracy on Five Qwen3 and
+Llama Models" (12 words). Introduction opens on simple_python_21 at Q3_K_M (the GCD call replaced by a
+wrong sentence). Contributions rewritten with numbers and table pointers. Refrains cut: "no judge"
+once, "identical weights" twice. tectonic build: 19 pages Letter, 0 unresolved references, 0 BLOCKED,
+0 em dashes (two en dashes are bibtex page ranges), 0 overfull boxes. The official PeerJ Overleaf
+template needs a PeerJ login to download; a plain article class with the stated conventions is used.
+
+refs.bib: six entries added, verified live on 29 Sep (CrossRef for the three PeerJ CS papers: Dincer
+& Kilimci 2026 e3769, Turkmen 2026 e4000, Hebenstreit et al. 2024 e1999; arXiv API plus OpenAlex for
+Kurtic et al. ACL 2025 and Lee et al. IJCAI 2025; the BFCL leaderboard data file). The author has not
+yet read the five papers; they are cited for what their abstracts state (edge deployment relies on
+compression; SLM surveys list quantization and tool use; CoT gains vary by model; two broad
+quantization evaluations with no tool-calling task). README rewritten to the formula title, no arXiv
+mention, Llama scripts and coerced.py listed. Local commit and local tag v1.2-peerj made; nothing pushed.
+
+PDF at the time of this entry: paper/peerj/main.pdf, 19 pages, sha256 1d3aed529d51a0f76691015c789ae587252116a55e3dc64daa1e15a9d80b4b27 (pre-submission; the
+DOI placeholder still has to be replaced, which changes the hash).

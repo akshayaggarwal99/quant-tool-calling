@@ -1,0 +1,8 @@
+source_page: https://gorilla.cs.berkeley.edu/leaderboard.html
+data_non_live: https://gorilla.cs.berkeley.edu/data_non_live.csv
+data_overall: https://gorilla.cs.berkeley.edu/data_overall.csv
+fetched_on: 2026-09-29
+server_last-modified: Mon, 13 Apr 2026 03:20:43 GMT
+page_last_updated_text: 2026-04-12
+leaderboard_version: BFCL V4 (as stated on the page)
+note: the page renders these CSV files with JavaScript; the CSVs are the data behind the table
