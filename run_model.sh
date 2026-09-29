@@ -6,6 +6,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE"
 TAG=$1; BFCL_MODEL=$2; STEM=$3; shift 3; RUNGS="$*"
 ALIAS="${BFCL_MODEL%-FC}"; PORT=8099; CAT="${CATEGORY:-simple_python}"
+curl -sf http://localhost:11434/ >/dev/null 2>&1 || { nohup ollama serve >/dev/null 2>&1 & sleep 5; }   # launchd runs without the Ollama app
 ollama pull "$TAG" >/dev/null 2>&1
 SRC=$(ollama show --modelfile "$TAG" 2>/dev/null | awk '/^FROM/{print $2; exit}')
 [ -f "$SRC" ] || { echo "[$STEM] no FP16 blob for $TAG"; exit 1; }

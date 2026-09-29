@@ -167,7 +167,7 @@ except Exception as e:
     print("gsm8k arm not ready:", e)
 
 # --- other models, simple_python at three rungs
-MODELS_ARM = [("Qwen3-8B", "EightB"), ("Qwen3-14B", "FourteenB")]
+MODELS_ARM = [("Qwen3-8B", "EightB"), ("Qwen3-14B", "FourteenB"), ("Llama-3.2-3B", "LlamaThreeB"), ("Llama-3.1-8B", "LlamaEightB")]
 M = {}
 for stem, w in MODELS_ARM:
     for q, rw in RUNG:
@@ -274,6 +274,79 @@ except Exception as e:
 with (TAB / "numbers.tex").open("a") as f:
     for k, v in bud.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
 print(f"budget: {len(bud)} macros")
+
+
+# ============================================================ second family: Llama GSM8K + failure types (27 Sep 2026)
+fam = {}
+try:
+    from gsm8k_score import strict as gstrict, lenient as glenient, norm as gnorm
+    FAM = [("Llama-3.2-3B", "LlamaThreeB"), ("Llama-3.1-8B", "LlamaEightB")]
+    FRUNG = [("Q8_0", "Eight"), ("Q4_K_M", "Four"), ("Q3_K_M", "Three")]
+    L = ["\\begin{tabular}{@{}llrrrrrrr@{}}", "\\toprule",
+         "Model & Rung & Tool acc. & vs.\\ Q8\\_0 & $p$ & Coerced & GSM8K strict & vs.\\ Q8\\_0 & $p$ \\\\", "\\midrule"]
+    for stem, w in FAM:
+        G = {}
+        for q, rw in FRUNG:
+            rows = [json.loads(l) for l in (RUNS / stem / "gsm8k" / f"{q}.jsonl").open()]
+            ver = {r["id"]: (gnorm(gstrict(r["content"])) == gnorm(r["gold"])) for r in rows}
+            len_ = {r["id"]: (gnorm(glenient(r["content"])) == gnorm(r["gold"])) for r in rows}
+            G[q] = ver
+            toks = sorted(r["completion_tokens"] or 0 for r in rows)
+            fam[f"{w}GsmN"] = len(rows)
+            fam[f"{w}GsmStrict{rw}"] = f"{100*sum(ver.values())/len(rows):.2f}"
+            fam[f"{w}GsmLenient{rw}"] = f"{100*sum(len_.values())/len(rows):.2f}"
+            fam[f"{w}GsmGap{rw}"] = f"{100*(sum(len_.values())-sum(ver.values()))/len(rows):+.2f}"
+            fam[f"{w}GsmTrunc{rw}"] = sum(1 for r in rows if r["finish_reason"] == "length")
+            fam[f"{w}GsmMedTok{rw}"] = toks[len(toks)//2]
+            # failure types on the tool-calling side, and a type-coerced re-score:
+            # a failure counts as coerced-correct when every error is a type error whose string value
+            # parses as the expected number/array/boolean (the value itself is what the reference holds).
+            sc = list((RUNS / stem / q / "score").rglob("*simple_python*score.json"))
+            if sc:
+                fails = [json.loads(l) for l in sc[0].open()][1:]
+                fam[f"{w}Fails{rw}"] = len(fails)
+                fam[f"{w}TypeErr{rw}"] = sum(1 for r in fails if str(r.get("error_type","")).startswith("type_error"))
+                fam[f"{w}DecodeErr{rw}"] = sum(1 for r in fails if str(r.get("error_type","")).startswith("ast_decoder"))
+                _pat = re.compile(r"Expected type (\w+), got (\w+)\. Parameter value: (.*)\.$")
+                def _coercible(f):
+                    if not str(f.get("error_type","")).startswith("type_error"): return False
+                    errs = f.get("error") or []; errs = [errs] if isinstance(errs, str) else errs
+                    for e in errs:
+                        m = _pat.search(e)
+                        if not m: return False
+                        exp, got, val = m.groups(); val = val.strip().strip("'\"")
+                        if exp in ("integer", "float", "number") and got == "str" and re.fullmatch(r"-?\d+(\.\d+)?", val): continue
+                        if exp == "array" and got == "str" and val.startswith("["): continue
+                        if exp == "boolean" and got == "str" and val.lower() in ("true", "false"): continue
+                        return False
+                    return True
+                coer = sum(1 for f in fails if _coercible(f))
+                fam[f"{w}Coercible{rw}"] = coer
+                ntool = extra.get(f"N{w}", 200)
+                fam[f"{w}CoercedAcc{rw}"] = f"{100*(ntool - len(fails) + coer)/ntool:.2f}"
+        for q, rw in FRUNG:
+            if q != "Q8_0" and f"{w}CoercedAcc{rw}" in fam:
+                dc = float(fam[f"{w}CoercedAcc{rw}"]) - float(fam[f"{w}CoercedAccEight"])
+                fam[f"{w}CoercedDelta{rw}"] = f"{dc:+.2f}"   # the unsigned-drop block below derives CoercedDrop
+            if q != "Q8_0":
+                lost, gained, pg = mcnemar(G["Q8_0"], G[q])
+                fam[f"{w}GsmDelta{rw}"] = f"{100*(sum(G[q].values())-sum(G['Q8_0'].values()))/len(G[q]):+.2f}"
+                fam[f"{w}GsmP{rw}"] = f"{pg:.3f}" if pg >= 0.001 else "$<$0.0001"
+                fam[f"{w}GsmLost{rw}"], fam[f"{w}GsmGained{rw}"] = lost, gained
+        for q, rw in FRUNG:
+            ta = extra.get(f"Acc{w}{rw}", "?"); td = extra.get(f"Delta{w}{rw}"); tp = extra.get(f"P{w}{rw}", "")
+            gs = fam[f"{w}GsmStrict{rw}"]; gd = fam.get(f"{w}GsmDelta{rw}"); gp = fam.get(f"{w}GsmP{rw}", "")
+            fmt = lambda d: "baseline" if d is None else d.replace("-", "$-$").replace("+", "$+$") + "\\,pp"
+            bold = lambda pv: (f"\\textbf{{{pv}}}" if pv and _pf(pv) < 0.05 else pv)
+            ca = fam.get(f"{w}CoercedAcc{rw}", "?")
+            L.append(f"{stem} & {q.replace('_', chr(92)+'_')} & {ta}\\% & {fmt(td)} & {bold(tp)} & {ca}\\% & {gs}\\% & {fmt(gd)} & {bold(gp)} \\\\")
+        L.append("\\midrule")
+    L = L[:-1] + ["\\bottomrule", "\\end{tabular}"]; (TAB / "llama.tex").write_text("\n".join(L) + "\n")
+except Exception as e:
+    print("second-family macros not ready:", e)
+with (TAB / "numbers.tex").open("a") as f:
+    for k, v in fam.items(): f.write(f"\\newcommand{{\\qt{mac(k)}}}{{{v}}}\n")
+print(f"second family: {len(fam)} macros")
 
 # ============================================================ unsigned drops for prose ("loses X points")
 _n = (TAB / "numbers.tex").read_text()

@@ -250,3 +250,30 @@ evaluations (Jin 2024, Li 2024, Liu 2025) contain no tool-calling benchmark, so 
 stands. Also caught "loses -4.75 points" (signed macro after "loses"); added unsigned Drop macros.
 Submitted as arXiv submit/8125878: cs.AI, cross-list cs.LG + cs.SE, CC BY 4.0. Bundle
 paper/arxiv-v1.tar.gz (tex, bbl, bib, tables, figure). Compiled clean on arXiv pdflatex, 9 pages.
+
+### 25 Sep: arXiv rejected the paper; TMLR version prepared; second family (Llama) queued
+
+arXiv submit/8125878 rejected (MOD-105986, "not sufficient original or substantive scholarly
+research"; no resubmission; appeal only with a journal DOI). TMLR version built in paper/main_tmlr.tex
+(anonymous, tmlr.sty, 10 pp). The pre-submission gate failed on "one model family", so a second
+family runs before submission: Llama-3.2-3B-Instruct and Llama-3.1-8B-Instruct, three rungs each
+(Q8_0/Q4_K_M/Q3_K_M) from the Ollama fp16 blobs via llama-quantize, BFCL simple_python n=200
+(subset200.json, same as Qwen3-8B/14B) plus GSM8K x400 at the 4,096 budget. Driver: run_llama.sh via
+nightly.sh (02:00, 5 h windows, launchd loaded 25 Sep). Two gotchas found in a 3-item daytime smoke
+(about one minute of GPU): meta-llama HF repos are gated, so BFCL's LlamaHandler_3_1 cannot fetch
+config/tokenizer; fixed with REMOTE_OPENAI_BASE_URL=http://localhost:8099/v1 (the handler only honours
+the tokenizer override when that is set) and REMOTE_OPENAI_TOKENIZER_PATH=unsloth/<model> (ungated
+copies of the same files). Smoke: 3/3 correct at Q8_0. gsm8k_gen.py now takes the alias from
+GSM_MODEL. Expected: 3B BFCL ~4 h, 3B GSM8K ~3 h, 8B BFCL ~12 h, 8B GSM8K ~6-8 h; four windows.
+
+### 26 Sep: window 1 of the Llama arm ran in 2-minute slivers; flow fixed
+
+No wake timer was set, so launchd fired on the first dark wake (02:13) and the Mac went back to
+sleep two minutes later, 23 times, until the display came on at 07:55. `caffeinate -i` does not
+hold a dark wake. Log timestamps are therefore wall-clock through sleep (Q8_0 "04:40 to 07:43" is
+mostly sleep; the Q8_0 server log shows 163 ms/token prompt eval, a starved process). Results are
+still valid: BFCL is request-based and every rung has 200 rows, 0 errors, 0 empty. Llama-3.2-3B
+simple_python n=200: Q8_0 92.0, Q4_K_M 88.0, Q3_K_M 86.5 (raw, unpaired; McNemar later). GSM8K
+Q8_0 reached 240/400, all finish_reason=stop, median 187 tokens. Window overran to 08:03 because
+gtimeout does not count sleep; killed by hand. nightly.sh rewritten: caffeinate -i -s, real-clock
+watchdog, absolute STOP_AT=07:30. Wake timer still needed: sudo pmset repeat wakeorpoweron MTWRFSU 01:58:00.

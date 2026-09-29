@@ -5,7 +5,9 @@ import json, sys, time
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 
-PORT, OUT, MODEL = sys.argv[1], sys.argv[2], "Qwen/Qwen3-1.7B"
+PORT, OUT = sys.argv[1], sys.argv[2]
+import os as _os
+MODEL = _os.environ.get("GSM_MODEL", "Qwen/Qwen3-1.7B")  # alias the server was started with
 client = OpenAI(base_url=f"http://localhost:{PORT}/v1", api_key="x")
 PROMPT = ("Solve the following math problem step by step. "
           "Finish with a line of the form 'The answer is N.' where N is a number.\n\n{q}")
@@ -37,6 +39,7 @@ if os.path.exists(OUT):
         try: done.add(json.loads(l)["id"])
         except Exception: pass
 recs = [r for r in recs if r["id"] not in done]
+if _os.environ.get("GSM_LIMIT"): recs = recs[: int(_os.environ["GSM_LIMIT"])]  # smoke tests only
 print(f"  resuming: {len(done)} done, {len(recs)} to go", flush=True)
 with open(OUT, "a") as f, ThreadPoolExecutor(4) as ex:
     for i, res in enumerate(ex.map(one, recs), 1):
