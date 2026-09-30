@@ -1,13 +1,13 @@
-\begin{tabular}{@{}llrrrrlrr@{}}
+\begin{tabular}{@{}llrrrrrlrl@{}}
 \toprule
-Model & Rung & Strict failures & Type errors & Decode errors & Coercible & GSM8K strict [95\% CI] & vs.\ Q8\_0 & $p$ \\
+Model & Rung & Strict failures & Type errors & Decode failures & JSON calls & Coercible & GSM8K strict [95\% CI] & vs.\ Q8\_0 & $p$ (Holm) \\
 \midrule
-Llama-3.2-3B & Q8\_0 & 16 & 6 & 0 & 3 & 84.00\% [80.1, 87.3] & baseline &  \\
-Llama-3.2-3B & Q4\_K\_M & 24 & 10 & 0 & 6 & 81.25\% [77.1, 84.8] & $-$2.75\,pp & 0.126 \\
-Llama-3.2-3B & Q3\_K\_M & 27 & 13 & 0 & 9 & 75.50\% [71.1, 79.5] & $-$8.50\,pp & \textbf{$<$0.0001} \\
+Llama-3.2-3B & Q8\_0 & 16 & 6 & 0 & 0 & 3 & 84.00\% [80.1, 87.3] & baseline &  \\
+Llama-3.2-3B & Q4\_K\_M & 24 & 10 & 0 & 0 & 6 & 81.25\% [77.1, 84.8] & $-$2.75\,pp & 0.126 (0.126) \\
+Llama-3.2-3B & Q3\_K\_M & 27 & 13 & 0 & 0 & 9 & 75.50\% [71.1, 79.5] & $-$8.50\,pp & $<$0.0001 (\textbf{0.0001}) \\
 \midrule
-Llama-3.1-8B & Q8\_0 & 100 & 90 & 3 & 84 & 91.00\% [87.8, 93.4] & baseline &  \\
-Llama-3.1-8B & Q4\_K\_M & 74 & 61 & 6 & 55 & 87.75\% [84.2, 90.6] & $-$3.25\,pp & \textbf{0.041} \\
-Llama-3.1-8B & Q3\_K\_M & 57 & 32 & 14 & 27 & 83.25\% [79.3, 86.6] & $-$7.75\,pp & \textbf{$<$0.0001} \\
+Llama-3.1-8B & Q8\_0 & 100 & 90 & 3 & 2 & 86 & 91.00\% [87.8, 93.4] & baseline &  \\
+Llama-3.1-8B & Q4\_K\_M & 74 & 61 & 6 & 5 & 60 & 87.75\% [84.2, 90.6] & $-$3.25\,pp & 0.041 (\textbf{0.041}) \\
+Llama-3.1-8B & Q3\_K\_M & 57 & 32 & 14 & 13 & 40 & 83.25\% [79.3, 86.6] & $-$7.75\,pp & $<$0.0001 (\textbf{0.0001}) \\
 \bottomrule
 \end{tabular}

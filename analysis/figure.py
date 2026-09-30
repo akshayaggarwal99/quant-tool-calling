@@ -25,7 +25,12 @@ for q in RUNG:
     rows = [json.loads(l) for l in (RUNS / "gsm8k" / f"{q}.jsonl").open()]
     math17.append(100 * sum(norm(strict(r["content"])) == norm(r["gold"]) for r in rows) / len(rows))
     mtoks[q] = sorted(r["completion_tokens"] or 0 for r in rows)
-ttoks = {q: sorted(int(m) for m in re.findall(r"n_gen =\s*(\d+)", (RUNS / f"{q}.server.log").read_text())) for q in ("Q8_0", "Q3_K_M")}
+def tool_toks(run_dir):
+    """Per-request completion length from BFCL's result file (the server log's n_gen lines are
+    3-second progress prints, several per long request, and were used here before 29 Sep 2026)."""
+    rs = next((run_dir / "result").rglob("*simple_python*.json"))
+    return sorted(json.loads(l)["output_token_count"] for l in rs.open() if l.strip())
+ttoks = {q: tool_toks(RUNS / q) for q in ("Q8_0", "Q3_K_M")}
 
 fig, (a, b) = plt.subplots(1, 2, figsize=(7.0, 2.7), gridspec_kw={"width_ratios": [1.05, 1]})
 x = list(range(len(RUNG)))

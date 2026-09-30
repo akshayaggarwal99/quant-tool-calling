@@ -431,3 +431,125 @@ the same unqualified malekar2025amdahl sentence; it shares refs.bib, so the bib 
 it. Rebuilt with tectonic: 19 pages, 0 undefined references, 0 "??". Bibliography page ranges now
 render five en dashes (two before); prose has none. PDF sha256
 90a78d16992bd914382cbe132a731c9e7862fab510f7a2b66c42d62505def386.
+
+## 29 Sep 2026, evening: PeerJ revision after three reviews (entry appended after the 30 Sep entry because entries are added in the order they are written)
+
+Three reviews of paper/peerj/main.tex (an academic editor's refutation pass, a quantization
+researcher, a hostile desk editor) returned overlapping blocking issues. This entry records what was
+checked against the raw files, what changed, and what was found on the way that the reviewers had
+not raised. All edits are local; nothing was pushed, deposited or submitted.
+
+The hypothesis record. `git log` confirms the reviewers' reading: paper/preregistration.md first
+appears in cac7796 (18 Sep 2026, 17:37:31 -0700) together with the finished ladder (rung logs
+14:33 to 15:23) and both repeat arms (17:05); 07cee6b (17:56) changed only the open-items line about
+the extractor; the Hypotheses section is byte-identical since the first commit; prereg-v1 points at
+cac7796 and exists locally only. The paper no longer says "pre-registered" anywhere. Section 3.1
+gives the commit hashes and times and says the record cannot show the hypotheses preceded the
+results; a deviations table (Table 1) lists FP16 not run, the dropped models and subsets, the
+unreported metrics, the H1/H2/H3 statistics, the post hoc tests, the extractor edit, the hardware and
+the title. preregistration.md itself was not edited.
+
+Statistics. analysis/paper_numbers.py now applies Holm within families (one per model on the
+single-call arm across both verdicts, one per model on GSM8K, one for multi-turn, one for the
+penalty arm; 28 tests in 10 families), prints raw and adjusted p in every table, uses the adjusted
+p in the cliff rule, and adds an Agresti and Min (2005) interval on every paired difference and a
+Connor (1987) minimum detectable difference per model at Q4_K_M (new Table 6, fourbit.tex). Under
+the per-model family the Llama-3.2-3B strict Q4_K_M loss (9 lost, 1 gained, p = 0.021) adjusts to
+0.064 and is reported as suggestive; its strict cliff rung moves to Q3_K_M (adjusted 0.030). The
+Qwen3-1.7B Q3_K_M cliff adjusts to 0.017. Refs added: holm1979, agresti2005paired, connor1987paired.
+
+Hypotheses as written. H1 on schema validity (share of outputs decoded as a call): 99.75% at Q8_0,
+never below 98.75%, threshold 94.76%, never triggers; H1 fails under either statistic. H2 structural
+share of failures (decode, wrong name, wrong count, missing parameter) Q8_0 to Q3_K_M: Qwen3-1.7B
+9.1% to 15.4% (+6.3, fails the 15-point threshold); Qwen3-8B +42.9 on 7 failures; Qwen3-14B 0;
+Llama-3.2-3B -10.2; Llama-3.1-8B +21.6 by BFCL's categories and +0.8 after the JSON re-read below
+(new Table 9, htwo.tex). H3 as registered is supported: AST drop 4.75 vs strict free-form drop 39.50
+at Q3_K_M, difference 34.75; the strict-minus-lenient gap (at most 0.50) is now a separate,
+unregistered observation, and the "three of five did not hold" tally is corrected to one held (H3),
+three did not (H1, H2, H4), one not evaluable (H5). Hallucinated-function rate at most 0.75% (3 of
+400 on Qwen3-1.7B at Q3_K_M, all corrupted spellings of the right name).
+
+Truncation. Per rung, GSM8K truncated generations are 28, 32, 21, 34, 213; of the 213 at Q3_K_M,
+164 have no committed answer, 20 commit to a wrong one and 29 commit to the right one and run on
+(counted correct; 187 = 158 finished + 29). Q8_0 already truncates 7%. Two new columns in Table 4.
+BudOf is now taken from the data (213) and asserted equal to the truncated count.
+
+Per-request lengths. The "n_gen" lines in llama-server logs are 3-second progress prints, several
+per long request, not one per request; the earlier medians (182 tokens, p90 753, "1 of 539
+requests") and the multi-turn medians (509 vs 213) were biased by them. Replaced by
+output_token_count from BFCL's result files: single call median 195 (Q8_0) and 155 (Q3_K_M), p90
+411 and 353, 1 of 400 Q3_K_M requests at the 4,096 cap. At Q3_K_M 178 of 400 generations have an
+empty reasoning block (0 at Q8_0 and Q4_K_M); those score 87.1% vs 86.9% for the ones that reason.
+figure.py switched to the same source; Figure 1(b) regenerated (matplotlib installed into .venv;
+numpy re-pinned to 1.26.4 afterwards because bfcl-eval requires it).
+
+Found while reading the raw files, not raised by the reviewers.
+
+1. Llama-3.1-8B decode failures. bfcl-eval 2026.3.23's LlamaHandler_3_1.decode_ast() decodes a
+   single call with Python eval(); JSON's true/false/null are not Python literals. Of the 3, 6 and
+   14 "ast_decoder" failures at Q8_0, Q4_K_M and Q3_K_M, 2, 5 and 13 are well-formed
+   {"name": ..., "parameters": {...}} objects with a bare boolean. Raw outputs with a bare boolean:
+   2, 5, 13 of 200; quoted boolean: 20, 18, 9; quoted number: 61, 35, 12; bare number: 82, 109,
+   134. analysis/coerced.py now re-reads a decode failure with json.loads and checks it like any
+   other call. Llama-3.1-8B coerced moves from 92.00 / 90.50 / 85.00 to 93.00 / 93.00 / 91.50;
+   the "7-point coerced loss at three bits" was mostly the parser (Q3_K_M now -1.50, p = 0.508).
+   Qwen3 and Llama-3.2-3B have no decode failures and are unchanged. The abstract, contributions,
+   Section 4.5, Discussion and Conclusions were rewritten to match.
+2. Multi-turn aborts. The multi_turn_base result files contain "Error during inference: ...
+   Context size has been exceeded." for 46, 59 and 137 of 200 trajectories at Q8_0, Q4_K_M and
+   Q3_K_M (plus 2, 1, 2 handler KeyErrors on malformed calls); BFCL scores every one as a failure.
+   The server ran 4 slots on a unified 32,768-token KV cache (n_ctx_slot = 32768, kv_unified =
+   true), so concurrent trajectories shared it; on completed trajectories the per-request context
+   never exceeded 22,539 tokens. The 17.0 / 13.5 / 1.5 accuracies are therefore dominated by the
+   abort rate. Completed-only accuracy 34/152, 27/140, 3/61. Section 4.6 now reports the arm as
+   confounded and H5 as not evaluable; Table 8 carries the abort counts. A re-run with one slot or
+   a per-slot cache is on the author checklist. The earlier drafts' "supported by a wide margin"
+   is withdrawn.
+3. FP16 size. SizeFp was hard-coded as 3.8 (GiB, from the notebook) while the other sizes are
+   decimal GB from st_size; the Ollama manifest (copied to runs/ollama-manifest-qwen3-1.7b-fp16.json)
+   gives 4,069,678,752 bytes = 4.1 GB, so CompressFour is 32% rather than 34%.
+
+Other fixes from the reviews: abstract H4 sentence corrected (accuracy unchanged, 2 verdicts flip
+each way per rung); "1 of 539 requests" corrected; "safe"/"costs nothing" replaced by the interval
+bound (coerced lower ends no worse than -5.2 points, MDD 2.8 to 3.7); the abstract's three-bit
+sentence names the verdict for Llama-3.2-3B; mirror repositories, snapshot commits and SHA-256 of
+the tokenizer_config.json and config.json files added to Section 3.8 (unsloth/Llama-3.1-8B-Instruct
+snapshot 4699cc75b550f9c6f3173fb80f4703b62d946aa5: tokenizer_config.json
+671ecdff1a4241f7d3e0ad21d347ada7d90f673810906727c124972e3ce03465, config.json
+ad98082c6bc4ea7078915219241814762be259de16d6ca5f170ba02820b3928b; unsloth/Llama-3.2-3B-Instruct
+snapshot 006f5dcd1393c3add266de40994ba96225e9689d: tokenizer_config.json
+9ddd255c19fe319c8d4e891163540382e9fbda99f394674f2a929efc47d57458, config.json
+eadff796b79b82cefa0537004668d70a1dd099fd4986b91ef88398ed91b26311); context settings and the shared
+cache stated in Section 3.4 with the argument that they cannot affect a single call; the extractor
+takes the last commitment (stated); llama-server --version confirms "0.4.1 (build 10964, commit
+b29c606e2)"; multi_turn_base has 200 items, so n = 200 is the whole category (stated); Table 5
+caption says the Qwen3-1.7B rows come from Table 3; the Dondeti bib entry carries its OpenReview
+URL; refrains trimmed ("nothing changed" removed, "the rungs that matter" removed, the aphorism
+"The output with no slack is the one that holds up" cut; contribution 2 no longer claims most papers
+omit repeats); the reproducibility sentence names the recorded throughput as the one exception.
+Data Availability now names tag v1.3-peerj and the placeholder DOI 10.5281/zenodo.XXXXXXX (reserved,
+to be activated on acceptance); a Use-of-generative-AI declaration and a Preprint declaration (arXiv
+submission not announced, nothing public) were added; Competing Interests states the work is
+unaffiliated with the employer. Written for the author: paper/peerj/COVER-LETTER-DRAFT.md,
+AUTHOR-CHECKLIST.md (Zenodo DOI, tag push, OSF option, city and country, AI-statement wording,
+cross-check and re-run decisions), fig1-legend.txt (standalone legend for the separate figure
+upload), GATE-REPORT.md.
+
+Not done, and why. The Llama-3.1-8B second-path cross-check and the multi-turn re-run each need
+about an hour of the author's GPU and a decision the notebook already leaves to the author; the
+paper states both as not run. No Zenodo deposit, OSF registration, push or account action was made.
+The Turkmen and Hebenstreit citations were kept (the venue-citation gate needs three; both were
+read on 30 Sep and their sentences narrowed then). paper/main_tmlr.tex is now stale: it states the
+multi-turn and Llama-3.1-8B results this revision corrected and no longer compiles against the
+regenerated macros (MtNgen* were removed because they were biased); it must not be submitted.
+
+Timing note for the recovery contract: the 18 Sep entry's "roughly 100 minutes per rung" does not
+match the rung logs (Q8_0 14:33, Q6_K 14:44, Q5_K_M 14:58, Q4_K_M 15:12, Q3_K_M 15:23, about
+12 minutes per rung); the 100-minute figure was the serial estimate (400 items at 15 s) and ignored
+the four parallel slots. The log times are the record.
+
+Build: tectonic, 24 pages US Letter, 0 undefined references, 0 "??", 0 BLOCKED, 0 em dashes, en
+dashes only in bibliography page ranges, 0 overfull boxes, abstract 486 words. paper_numbers.py:
+986 macros, 28 McNemar tests in 10 Holm families. PDF sha256
+64d9909933083639c5994e91647dd8858fe5a5a6ab34e4ec4c9aebc4c6923538. Local commit and local tag
+v1.3-peerj; nothing pushed.

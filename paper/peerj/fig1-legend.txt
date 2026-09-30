@@ -1,0 +1,12 @@
+Figure 1. Tool calling and free-form mathematics across one quantization ladder.
+(a) Accuracy across the llama.cpp k-quant ladder (Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q3_K_M, all produced
+from one FP16 source) on identical weight files: tool calling on the Berkeley Function Calling
+Leaderboard simple_python category (n = 400, deterministic AST matching) and free-form mathematics
+on 400 GSM8K questions (strict extractor), both for Qwen3-1.7B; Qwen3-8B tool calling (n = 200)
+dashed. Both floors sit at Q4_K_M. The free-form drop at Q3_K_M (39.50 points) is about eight
+times the tool-calling drop (4.75 points). (b) Cumulative distribution of per-request completion
+length, in tokens on a log scale, at Q8_0 and Q3_K_M for each task, taken from the result files.
+Tool calls are short at both rungs, and shorter at Q3_K_M because 178 of 400 skip the reasoning
+block; math generations at Q3_K_M pile up against the 4,096-token completion budget (dotted line)
+and 213 of 400 reach it. Source file: paper/figures/fig1-ladder.pdf, produced by analysis/figure.py
+from runs/. The numbers are those of Tables 3 and 4 of the manuscript.

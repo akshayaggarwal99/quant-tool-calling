@@ -4,15 +4,15 @@ Code, run logs and raw generations for the paper *Post-Training k-Quantization a
 
 The question: at what bit-width does llama.cpp k-quant quantization break an agent's tool calls, and does it break them before or after it breaks free-form reasoning on the same weight files?
 
-The answer, for Qwen3-1.7B: both floors sit at Q4_K_M, but the tool call loses about 5 points at Q3_K_M where free-form math loses about 40, because three-bit weights make the chain of thought run past its token budget and a tool call is over long before that happens. No cliff at 8B or 14B. Multi-turn tool calling at three bits collapses from 17% to 1.5%. On the Llama family the strict schema score moves in both directions under quantization because compression changes how the models type their arguments (Llama-3.1-8B at Q8_0 writes numbers as quoted strings, which the strict checker rejects); scored on the parsed value, four bits costs neither Llama model detectable accuracy and three bits costs Llama-3.1-8B about 7 points.
+The answer, for Qwen3-1.7B: both floors sit at Q4_K_M, but the tool call loses about 5 points at Q3_K_M where free-form math loses about 40, because three-bit weights make the chain of thought run past its token budget and a tool call is over long before that happens. No cliff at 8B or 14B. On the Llama family the strict schema score moves in both directions under quantization because compression changes how the models type their arguments (Llama-3.1-8B at Q8_0 writes numbers as quoted strings, which the strict checker rejects, and at Q3_K_M writes bare JSON booleans, which the BFCL handler's Python `eval()` refuses); scored on the parsed value, neither Llama model shows a detectable loss at four or three bits. The multi-turn arm (17% to 1.5% at three bits) is confounded: 46, 59 and 137 of 200 trajectories aborted on a KV cache shared by four server slots, and it has to be re-run with a per-trajectory context.
 
 ## What is here
 
 | Path | Contents |
 |---|---|
-| `paper/` | LaTeX source (`peerj/main.tex` is the current manuscript; `main_tmlr.tex` and `main.tex` are earlier versions), `preregistration.md` (hypotheses frozen 18 Sep 2026, before the first run), figure and generated tables |
+| `paper/` | LaTeX source (`peerj/main.tex` is the current manuscript; `main_tmlr.tex` and `main.tex` are earlier versions that predate the 29 Sep revision and no longer compile against the regenerated tables), `preregistration.md` (the hypothesis file, dated 18 Sep 2026; its first commit, cac7796 at 17:37 that day, postdates the first ladder, so the paper does not call it a pre-registration), figure and generated tables |
 | `analysis/paper_numbers.py` | Recomputes every number in the paper from `runs/` and writes `paper/tables/*.tex`. Nothing in the paper is typed by hand |
-| `analysis/coerced.py` | The type-coerced secondary tool-calling score: each strict BFCL failure re-checked by BFCL's own checker after quoted arguments are parsed to the schema's type |
+| `analysis/coerced.py` | The type-coerced secondary tool-calling score: each strict BFCL failure re-checked by BFCL's own checker after quoted arguments are parsed to the schema's type, and each decode failure re-read as JSON when it is one well-formed call; also the failure classification (structural vs semantic) |
 | `analysis/bfcl_leaderboard/` | The public BFCL V4 leaderboard data files used for the Llama-3.1-8B comparison, with the fetch record |
 | `analysis/figure.py` | Figure 1 |
 | `runs/` | BFCL result and score files for every rung and model, GSM8K generations, the 16K budget re-run, `llama-server` logs, and the reproducibility repeats |
@@ -49,7 +49,7 @@ Every script is resumable: a rung that already has a score directory is skipped.
   title  = {Post-Training k-Quantization and Agentic Tool-Calling Accuracy on Five Qwen3 and Llama Models},
   author = {Kumar, Akshay},
   year   = {2026},
-  note   = {Manuscript, September 2026. Code and data: https://github.com/akshayaggarwal99/quant-tool-calling}
+  note   = {Manuscript, September 2026, tag v1.3-peerj. Code and data: https://github.com/akshayaggarwal99/quant-tool-calling}
 }
 ```
 
