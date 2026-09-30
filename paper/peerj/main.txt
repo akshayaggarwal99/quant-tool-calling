@@ -1,0 +1,1092 @@
+Post-Training k-Quantization and Agentic Tool-Calling
+Accuracy on Five Qwen3 and Llama Models
+
+
+Akshay Kumar1
+
+1 Independent Researcher
+
+
+
+
+Corresponding author:
+Akshay Kumar1
+Email address: akumar8@mt.iitr.ac.in
+ORCID: 0009-0006-3613-538X
+
+
+
+Article type: Research Article
+Journal: PeerJ Computer Science
+1    Post-Training k-Quantization and Agentic Tool-Calling
+2         Accuracy on Five Qwen3 and Llama Models
+
+3                                           Akshay Kumar
+
+
+4                                                 Abstract
+
+5           Background. Language models run on laptops after post-training quantization, and the
+6      format that ships is the llama.cpp k-quant. The accuracy cost of that compression has been
+7      measured on prose, knowledge and reasoning benchmarks, and not on the output an agent
+8      produces, which is a function call that a program then executes.
+9           Methods. We built a ﬁve-rung k-quant ladder, Q8_0 to Q3_K_M, from one FP16 source
+10     for Qwen3-1.7B, and three-rung ladders for Qwen3-8B, Qwen3-14B, Llama-3.2-3B and
+11     Llama-3.1-8B. Every rung was scored on the Berkeley Function Calling Leaderboard’s
+12     simple_python category by deterministic syntax-tree matching (n = 400 or 200), with a
+13     type-coerced secondary score, and on 400 GSM8K questions with the same weight ﬁles.
+14     Rungs are compared with McNemar’s exact test on identical items, corrected within each
+15     model’s family of tests by Holm’s method; every accuracy and every paired difference carries
+16     a 95% interval; two rungs were each run three times to measure the instrument. Five
+17     hypotheses with thresholds were written in a dated ﬁle on the ﬁrst day; its ﬁrst commit
+18     postdates the ﬁrst ladder, so the study is not called pre-registered, and every departure from
+19     the ﬁle is tabulated.
+20          Results. On Qwen3-1.7B tool calling is ﬂat from Q8_0 through Q4_K_M and loses 4.75
+21     points at Q3_K_M (Holm-adjusted p = 0.017), about 10 times the run-to-run range.
+22     Free-form mathematics on those ﬁles loses 39.50 points at that rung because 213 of 400
+23     generations reach the 4,096-token budget while still reasoning; 29 of them commit to a
+24     correct answer ﬁrst. Qwen3-8B and Qwen3-14B show no loss at any rung. Llama-3.2-3B
+25     loses 5.50 strict points at Q3_K_M (Holm p = 0.030) and a suggestive 4.00 at Q4_K_M
+26     (p = 0.021, Holm 0.064, one run); under the coerced verdict neither loss is detectable.
+27     Llama-3.1-8B’s strict score rises from 50.00% to 71.50% down the ladder because its
+28     full-precision weights write numbers as quoted strings; scored on the parsed value, with 13 of
+29     its 14 three-bit decode failures re-read as the well-formed JSON calls they are, it scores
+30     93.00%, 93.00% and 91.50%. A fair answer extractor moves the free-form numbers by at
+31     most 0.50 points, and a logit penalty on overthinking markers changes tool-calling accuracy
+32     by 0.00 points. The multi-turn arm is confounded: 46, 59 and 137 of 200 trajectories aborted
+33     on a server context limit shared by four slots.
+34          Conclusions. At four bits no model shows a single-call loss larger than its paired interval
+35     allows: under the coerced verdict no lower interval end is below −5.2 points and the
+36     minimum detectable difference is 2.8 to 3.7 points. At three bits Qwen3-1.7B and, under strict
+37     scoring, Llama-3.2-3B lose accuracy; the other three models do not detectably. The
+38     length-driven collapse of chain-of-thought reasoning under three-bit weights does not reach a
+
+
+                                                      1
+39         single tool call. A strict schema score can move in either direction under quantization because
+40         it also measures a formatting habit, and part of a checker’s decode-failure count can be its
+41         own parser, so a coerced score and the failure types belong beside it.
+
+42   Keywords. post-training quantization; llama.cpp; k-quant; tool calling; function calling; language
+43   model agents; BFCL; GSM8K; multiple comparisons
+
+
+44   1    Introduction
+45   A laptop runs Qwen3-1.7B in its three-bit k-quant, Q3_K_M, as the model behind a small agent.
+46   The agent is asked to ﬁnd the greatest common divisor of 36 and 48 and is handed one function to
+47   call, number_theory.gcd. The same model at eight bits, Q8_0, answers with the call
+48   number_theory.gcd(number1=36, number2=48). At three bits it answers with a sentence:
+49   “The Greatest Common Divisor (GCD) of two numbers, say 36 and 48, is 24.” The program
+50   waiting for a call receives prose, and the number in the prose is wrong as well; the answer is 12.
+51   Both outputs came from one FP16 weight ﬁle. Only the number of bits used to store each weight
+52   changed. This is item simple_python_21 of the benchmark used below, one of 30 items the
+53   three-bit weights lose against the eight-bit weights, and the question of this paper is how often that
+54   happens, at which bit-width it starts, and whether the function call or the free-form reasoning
+55   breaks ﬁrst.
+56   The compression is post-training quantization (Dettmers et al., 2022; Frantar et al., 2023; Lin
+57   et al., 2024). The full-precision ﬁle for Qwen3-1.7B is 4.1 GB; the version most people would run,
+58   Q4_K_M, is 1.3 GB, about 32% of it. The format nearly everyone uses on a laptop is the family of
+59   llama.cpp k-quants (Gerganov and contributors, 2023), because that is what Ollama and the
+60   desktop front ends serve, and a systematic review of language-model deployment on edge devices
+61   counts model compression, quantization included, as a central enabler of running these models on
+62   memory-limited hardware (Dinçer and Kilimci, 2026). Four bits is where the scaling analysis says
+63   the trade-off is best (Dettmers and Zettlemoyer, 2023; Kumar et al., 2025), and it is the default
+64   most front ends pull. Lower bit-widths are pursued for throughput as well as size, although
+65   Malekar and Zand (2025) show, for binary and ternary weights, that the throughput gain is capped
+66   by whatever part of the model stays in higher precision.
+67   The cost of that compression has been measured with care, on tasks other than the one an agent
+68   performs. Broad evaluations cover language modelling, classiﬁcation, knowledge, dialogue, long
+69   context and trustworthiness across many families (Jin et al., 2024; Li et al., 2024); Kurtic et al.
+70   (2025) score the Llama-3.1 family under FP8, INT8 and INT4 on academic benchmarks and on
+71   chat, code-generation and long-context tasks; Lee et al. (2025) score instruction-tuned models
+72   from 1B to 405B under four quantization methods on thirteen datasets; multilingual degradation
+73   has its own study (Marchisio et al., 2024); long-context inputs lose up to 59% under four-bit
+74   methods (Mekala et al., 2025); reasoning models have been quantized and scored on mathematics
+75   and code (Liu et al., 2025). Kurt (2026) quantizes Llama-3.1-8B-Instruct into thirteen GGUF
+76   formats and scores each on GSM8K, HellaSwag, IFEval, MMLU, TruthfulQA and perplexity.
+77   Lotﬁ et al. (2026) measure ﬁve reasoning models under GPTQ, AWQ and FlatQuant on
+78   mathematics, code and science questions and ﬁnd accuracy falling as chain-of-thought inﬂates.
+
+                                                         2
+79    Every task in every one of these papers is free-form or multiple choice. None involves emitting a
+80    function call.
+81    An agent calls tools (Patil et al., 2024; Qin et al., 2024; Yao et al., 2025). It emits a function name
+82    and a set of typed arguments that a program will execute. That output either passes the checker or
+83    it does not, with no partial credit and no reader to accept an approximate answer. Our starting
+84    intuition was that a function signature has none of the slack prose has, so compression should
+85    break tool calling at a higher bit-width than it breaks free-form accuracy. We wrote this down as
+86    our ﬁrst hypothesis, with a threshold, in the hypothesis ﬁle described in §3.1.
+87    We built a controlled ladder, ﬁve k-quant formats produced from one FP16 source, and scored
+88    each rung on the Berkeley Function Calling Leaderboard (Patil et al., 2025), which compares a
+89    model’s call to a reference by deterministic abstract-syntax-tree matching; no model judges
+90    another model anywhere in the pipeline. We then ran each rung’s ﬁle on a free-form control so
+91    that the two ﬂoors could be compared on identical parameters, repeated Q8_0, Q4_K_M and
+92    Q3_K_M on four further models in two families, and re-scored every run under a checker that
+93    accepts a correctly valued argument in the wrong type.
+94    For Qwen3-1.7B the answer is the reverse of the one we expected. Tool-calling accuracy is ﬂat
+95    from Q8_0 through Q4_K_M and falls by 4.75 points at Q3_K_M, roughly 10 times the
+96    run-to-run noise of the instrument. On those ﬁles free-form mathematics falls by 39.50 points at
+97    the same rung. Both ﬂoors sit between four and three bits, but the drop in tool calling is about an
+98    eighth of the drop in mathematics. The difference comes down to output length. At three bits the
+99    model’s chain of thought (Wei et al., 2022) grows until 53% of math generations use up their
+100   token budget before reaching an answer. A tool call is a median of 155 tokens at that rung, so the
+101   weights never get the room to wander. On Qwen3-8B and Qwen3-14B there is no cliff at any
+102   rung. On the Llama family the picture is different, and part of the difference is the checker rather
+103   than the weights: Llama-3.2-3B loses at three bits under strict scoring and not under coerced
+104   scoring, and Llama-3.1-8B’s strict score rises under compression because its full-precision
+105   weights quote numbers, a habit the compressed weights partly lose (§4.5).
+106   Contributions. Each item names the table or ﬁgure that holds it.
+
+107      1. A controlled k-quant ladder for tool calling: 5 rungs from one FP16 source on Qwen3-1.7B
+108         (n = 400) and 3 rungs on 4 further models (n = 200), scored by a deterministic checker and
+109         by a type-coerced secondary checker, with McNemar tests on identical items, Holm’s
+110         correction within each model, Wilson 95% intervals on every accuracy and an interval on
+111         every paired difference (§3, Tables 3 and 5).
+112      2. An instrument measurement: identical weights re-run 3 times move by at most 0.50 points
+113         and ﬂip at most 4 of 400 verdicts (Table 2).
+114      3. The Qwen3-1.7B ﬂoor: no detectable loss down to Q4_K_M, then 4.75 points at Q3_K_M,
+115         Holm p = 0.017, 30 lost against 11 gained (Table 3); no loss at any rung on Qwen3-8B or
+116         Qwen3-14B (Table 5).
+117      4. The free-form comparison on the same weight ﬁles: 39.50 points at Q3_K_M with 213 of
+118         400 generations at the 4,096-token budget, 29 of which commit to a correct answer before
+119         running on (Table 4, Figure 1); a 16,384-token re-run of those 213 items leaves 77% still at
+120         the cap.
+
+                                                         3
+121       5. A second family scored two ways: Llama-3.2-3B loses 5.50 strict points at Q3_K_M (Holm
+122          p = 0.030) and 2.50 coerced points (p = 0.180); Llama-3.1-8B gains 21.50 strict points at
+123          Q3_K_M and loses 1.50 coerced points (p = 0.508), with 86 of its 100 Q8_0 strict failures
+124          being quoted values of the right number and 13 of its 14 Q3_K_M decode failures being
+125          well-formed JSON calls that the harness’s Python parser refuses (Tables 5 and 7).
+126       6. A bound for four bits: on every model the paired Q8_0 to Q4_K_M difference has a lower
+127          interval end no worse than −5.2 points under the coerced verdict, and the minimum
+128          detectable difference at n = 200 is 2.8 to 3.7 points (Table 6).
+129       7. Two null results: a fair extractor changes free-form accuracy by at most 0.50 points at any
+130          rung (Table 4), and a logit penalty on overthinking markers changes tool-calling accuracy
+131          by 0.00 points at Q3_K_M (§4.7).
+132       8. A multi-turn arm reported as confounded: 46, 59 and 137 of 200 trajectories aborted on a
+133          context limit shared by four server slots (Table 8), so the multi-turn hypothesis is not
+134          evaluable from this run.
+
+
+135   2     Related work
+136   Quantization evaluated on free-form tasks. The broad evaluations of post-training quantization
+137   score many model families on language modelling, multiple-choice knowledge, dialogue,
+138   long-context and trustworthiness tasks (Jin et al., 2024; Li et al., 2024); a full-text search of both
+139   ﬁnds no tool-calling or function-calling benchmark. Kurtic et al. (2025) run more than half a
+140   million evaluations on the Llama-3.1 family under FP8, INT8 and INT4 and ﬁnd FP8 effectively
+141   lossless, well-tuned INT8 1 to 3% below the BF16 baseline, and INT4 weight-only quantization
+142   on par with 8-bit; Lee et al. (2025) ﬁnd quantized models generally ahead of smaller full-precision
+143   ones but weaker on instruction following and hallucination detection. Neither scores a function
+144   call. Liu et al. (2025) quantize the DeepSeek-R1-distilled and QwQ reasoning models and ﬁnd
+145   mathematics and code degrading under aggressive weight and KV-cache quantization, again on
+146   free-form tasks. Kurt (2026) is the closest work and the one this paper extends: one model,
+147   thirteen llama.cpp formats from Q3_K_S to Q8_0 against FP16, six free-form or multiple-choice
+148   benchmarks, plus throughput and size. A full-text read ﬁnds no tool-calling, function-calling,
+149   agentic, structured-output or schema-compliance evaluation, and its conclusion asks for exactly
+150   what we add, additional model families and sizes under the same protocol. Lotﬁ et al. (2026) take
+151   a different axis, in the line of work on overthinking in reasoning models (Chen et al., 2024; Sui
+152   et al., 2025). Under GPTQ (Frantar et al., 2023), AWQ (Lin et al., 2024) and FlatQuant, ﬁve
+153   reasoning models lose accuracy while emitting longer chains of thought, and in up to 52% of
+154   failures the correct answer appears mid-trace without being committed to. Their compression
+155   methods are research methods rather than the k-quants that ship to laptops, and their failure
+156   categorisation, including the overthinking class, relies on GPT-5 as a judge. Setting quantization
+157   aside, the gain from zero-shot chain-of-thought prompting over direct answering holds on average
+158   across six models and six question-answering datasets but varies in size by model and dataset
+159   (Hebenstreit et al., 2024); what quantization does to the length of the chain is a further axis.
+160   Surveys of language models for constrained deployment list quantization among the standard
+
+
+                                                        4
+161   compression techniques (Turkmen, 2026; Dinçer and Kilimci, 2026), and the survey of small
+162   clinical models names agentic tool use as a future direction (Turkmen, 2026); neither measures the
+163   two together.
+164   Tool-calling evaluation. Gorilla (Patil et al., 2024) and ToolLLM (Qin et al., 2024) established
+165   API calling as a benchmark task, and τ -bench (Yao et al., 2025) extends it to multi-turn agent-user
+166   interaction. BFCL (Patil et al., 2025) scores a model’s function call against a reference by
+167   abstract-syntax-tree matching over the function name, argument names, types and values, across
+168   single, multiple and parallel calls, an irrelevance category where no call is correct, and multi-turn
+169   trajectories. Because the matcher is deterministic, the same generation always receives the same
+170   verdict, so a difference between two rungs can be attributed to the weights rather than to the
+171   scorer. Dondeti (2026) study the same class of small models on consumer hardware from the
+172   safety side, scoring adversarial tool calls from seven models between 1B and 4B parameters with
+173   a deterministic would-dispatch rule; this paper is the accuracy side of the same deployment.
+174   The gap. Quantization has been scored on prose, knowledge, instruction following and reasoning,
+175   for research compression methods and for the deployed one. It has not been scored on tool calling
+176   under either. That is what we measure.
+
+
+177   3    Materials and Methods
+
+178   3.1 The hypotheses and their record
+179   Five hypotheses with numerical thresholds are in paper/preregistration.md in the repository.
+180   The ﬁle is dated 18 September 2026 and, by the author’s own record, was written that morning
+181   before the ladder was built. The repository cannot show that. The ﬁle’s ﬁrst commit, cac7796 at
+182   17:37:31 on 18 September 2026 (UTC−7), also contains the completed ﬁve-rung ladder, whose
+183   rungs ﬁnished between 14:33 and 15:23 that afternoon, both repeat arms (17:05) and a ﬁndings
+184   note. A second commit, 07cee6b at 17:56, added the free-form extractor rules to the ﬁle’s
+185   open-items list after 59 Q8_0 generations had been read (§3.7); no other line of the ﬁle has
+186   changed since, so the hypotheses and thresholds in the repository are those of the ﬁrst commit,
+187   which the tag prereg-v1 marks. Because no independent time stamp precedes the ﬁrst results, we
+188   do not call the study pre-registered. What we do instead: each hypothesis is evaluated against the
+189   threshold the ﬁle states (§4.8); the statistics, which the ﬁle does not name, are labelled as choices
+190   made after the ﬁrst run (§3.2); and Table 1 lists every departure from the design the ﬁle describes.
+
+
+191   3.2 Problem statement
+192   A ladder for a model M is an ordered list of weight ﬁles r0 , r1 , . . . , rK produced from one FP16
+193   source with one quantizer, in decreasing bits per weight, so that the ﬁles differ in their weights and
+194   in nothing else. Here r0 is always Q8_0. An item set I is a ﬁxed list of n benchmark items with
+195   reference answers. A verdict v(i, r) ∈ {0, 1} is the deterministic output of a checker on the model’s
+196   response to item i served from rung r, and accuracy A(r) is the mean verdict over I. Two verdict
+
+
+                                                        5
+Item                Planned in the ﬁle                 Done                                  Why
+Reference arm       FP16                               Q8_0; no FP16 rung was run            No reason was recorded. Every
+                                                                                             comparison is against Q8_0.
+Models              DeepSeek-R1-Distill-Qwen           Qwen3-1.7B, 8B and 14B;               bfcl-eval has no model en-
+                    1.5B and 7B; Qwen3 1.7B,           Llama-3.1-8B; Llama-3.2-3B            try for the R1-Distill checkpoints
+                    4B, 8B and 14B; Llama-3.1-         added                                 (notebook, 19 Sep) nor for the
+                    8B                                                                       original Qwen3-4B, only for a
+                                                                                             later lineage (18 Sep). Llama-
+                                                                                             3.2-3B was added on 25 Sep as
+                                                                                             a second model in the 1.7B size
+                                                                                             band.
+BFCL subsets        Non-live, live and multi-turn,     simple_python on all ﬁve              Compute was spent in the order
+                    reported separately                models; multi_turn_base on            free-form control, penalty arm,
+                                                       Qwen3-1.7B                            larger models, multi-turn (note-
+                                                                                             book, 18 Sep); the live categories
+                                                                                             were never queued.
+Metrics             AST accuracy; schema va-           AST accuracy, type errors             The other models ran in sleep-
+                    lidity; hallucinated-function      and output length as planned;         interrupted nightly windows
+                    rate; type-error rate; output      schema validity, hallucinated-        (notebook, 26 Sep), so their
+                    length; latency                    function rate and structural share    wall-clock times are not a prop-
+                                                       added in this revision (§4.8);        erty of the model.
+                                                       latency for the Qwen3-1.7B
+                                                       ladder only
+H1 statistic        Schema validity below 95%          Reported as written (it never trig-   With no decode failures on
+                    of the reference                   gers) and on AST accuracy             Qwen3-1.7B, schema validity
+                                                                                             has almost no variance.
+H2 threshold        Structural share of failures up    Computed in this revision (Ta-        Not computed in earlier drafts.
+                    by 15 points                       ble 9)
+H3 statistic        AST drop smaller than the          Reported as written (supported);      Earlier drafts scored H3 on the
+                    strict free-form drop by 5         the strict-minus-lenient gap re-      extractor gap, a different quan-
+                    points                             ported separately                     tity.
+Statistical tests   None named                         McNemar’s exact test, Wilson          The ﬁrst four chosen on the
+                                                       intervals, α = 0.05 and the           evening of 18 Sep after the ﬁrst
+                                                       cliff rule; Holm’s correction,        ladder; the rest added after re-
+                                                       paired intervals and minimum          view.
+                                                       detectable differences
+Extra arms          Not in the ﬁle                     Repeat runs; the 16,384-token         Added as the results raised them.
+                                                       budget re-run; the coerced ver-
+                                                       dict; the penalty at two rungs
+Free-form extrac-   Strict regex; lenient hierarchi-   Strict widened to the boxed form      The ﬁrst rule was a strawman;
+tor                 cal                                after 59 Q8_0 generations were        the gap it would have produced
+                                                       read (07cee6b, 17:56)                 is not reported.
+Hardware            M1 Pro, 16 GB                      M1 Max, 64 GB                         The machine had more memory
+                                                                                             than assumed at planning (note-
+                                                                                             book, 18 Sep).
+Working title       Asserted H1                        Changed                               H1 reversed.
+
+Table 1: Every departure from the design in paper/preregistration.md. Dates refer to the lab
+notebook in the repository.
+
+
+
+                                                           6
+197   functions are used for tool calling. The strict verdict is BFCL’s abstract-syntax-tree match. The
+198   coerced verdict equals the strict verdict except that a strict failure is re-checked by the same
+199   checker after every string-typed argument whose schema declares a non-string type is replaced by
+200   its parsed value when it parses as that type, and after an output the handler could not decode is
+201   re-read as JSON when it is one well-formed call (§3.5); a quoted number, list or boolean counts
+202   when the parsed value is what the reference holds and not otherwise. The coerced verdict is never
+203   below the strict one.
+204   Rungs are compared to r0 pairwise on the same items. The test is McNemar’s exact test on the
+205   discordant pairs (McNemar, 1947): lost counts items with v(i, r0 ) = 1 and v(i, r) = 0, gained the
+206   reverse, and p is the two-sided exact binomial probability of a split at least that uneven under the
+207   null of no difference. Tests are grouped into families and corrected within each family by Holm’s
+208   step-down method (Holm, 1979). A family is every distinct McNemar test against one model’s
+209   Q8_0 on the single-call arm, under both verdicts; for the Qwen3 models the coerced verdicts equal
+210   the strict ones, so the family has one test per rung (4 for Qwen3-1.7B, 2 each for Qwen3-8B and
+211   Qwen3-14B), and for the Llama models two per rung (4 each). The free-form arm of each model,
+212   the multi-turn arm and the penalty arm are families of their own. The paper reports 28 tests in 10
+213   families, and every table gives the raw p with the Holm-adjusted p in brackets. Every accuracy
+214   carries a Wilson score 95% interval, in square brackets, and every paired difference carries the
+215   adjusted Wald 95% interval of Agresti and Min (2005). The cliff rung c(M) is the
+216   highest-precision rung rk , k ≥ 1, with A(rk ) < A(r0 ) and Holm-adjusted p < 0.05 against r0 . The
+217   ﬂoor is the rung immediately above the cliff rung, the lowest-bit rung on the ladder with no
+218   detected loss. A model is ﬂat on the ladder when it has no cliff rung, so its ﬂoor is at or below the
+219   lowest rung measured. A detected loss must also exceed the instrument tolerance τ , the largest
+220   range in accuracy across three runs of identical weights and settings (§4.1); on this instrument
+221   τ = 0.50 points, and every loss reported as a cliff below is at least 10 times larger. The test, the
+222   interval, α and the cliff rule were chosen on the evening of 18 September 2026, after the ﬁrst
+223   ladder had run and not in the hypothesis ﬁle; the Holm correction and the paired intervals were
+224   added after review.
+225   “No detectable loss” has a size. For each model at Q4_K_M, Table 6 gives the minimum
+226   detectable difference: the smallest paired loss McNemar’s test would detect at α = 0.05 with 80%
+227   power at the discordance rate observed on that model, from the sample-size formula of Connor
+228   (1987) solved for the difference. At n = 200 and the discordance seen here it is 2.8 to 3.7 points
+229   under the coerced verdict, so a loss of three points on an n = 200 model is inside what this design
+230   cannot exclude, and every “no detectable loss” below should be read with that bound beside it.
+231   Item counts are n = 400 for the Qwen3-1.7B ladder and both free-form arms, and n = 200 for the
+232   other four models and for the multi-turn category, which has 200 items in all. Every rung is a
+233   single run except the two Qwen3-1.7B rungs used for the tolerance measurement, so a stranger
+234   who repeats one rung should expect its accuracy to move within τ and its verdicts on a few items
+235   to ﬂip.
+236   Under these deﬁnitions the cliff rung is Q3_K_M for Qwen3-1.7B under both verdicts, none for
+237   Qwen3-8B and none for Qwen3-14B (both ﬂat), Q3_K_M strict and none coerced for
+238   Llama-3.2-3B, and none for Llama-3.1-8B under either verdict. The Results section gives the
+239   numbers behind each.
+
+
+                                                       7
+240   3.3 The ladder
+241   Every rung of Qwen3-1.7B (Qwen Team, 2025) is produced from a single FP16 GGUF with
+242   llama-quantize. The formats are a subset of the ladder in Kurt (2026), chosen to span the range
+243   at one rung per bit-width: Q8_0, Q6_K, Q5_K_M, Q4_K_M and Q3_K_M. Ollama’s library
+244   publishes only two of these ﬁve for this model, Q8_0 and Q4_K_M, alongside FP16, which is
+245   why the ladder is built rather than pulled. A Qwen3-4B rung was planned and dropped:
+246   bfcl-eval has no entry for the original Qwen3-4B, only for the later Instruct-2507 lineage, and
+247   mixing lineages would have confounded the size comparison. Four further models get three rungs,
+248   Q8_0, Q4_K_M and Q3_K_M: the top of the ladder, the default most front ends pull, and the ﬁrst
+249   rung below it. Each is built from its own FP16 source with the same quantizer: Qwen3-8B and
+250   Qwen3-14B from the same family, and Llama-3.2-3B-Instruct and Llama-3.1-8B-Instruct from a
+251   second family, whose Llama 3.1 models are described in Llama Team, AI @ Meta (2024). The
+252   FP16 sources are the *-fp16 blobs Ollama distributes. Per model the design is: Qwen3-1.7B, 5
+253   rungs, n = 400, with 3 runs at Q8_0 and Q4_K_M; Qwen3-8B, Qwen3-14B, Llama-3.2-3B and
+254   Llama-3.1-8B, 3 rungs each, n = 200, 1 run per rung. Both Llama models are instruction-tuned
+255   rather than reasoning-tuned, which is deliberate: it separates what the ladder does to a tool call
+256   from what it does to a chain of thought. Llama-3.1-8B-Instruct is also the model Kurt (2026)
+257   quantized, so the two ladders meet on one model.
+
+
+258   3.4 Serving
+259   Each rung is served by llama-server from llama.cpp (the binary reports version 0.4.1, build
+260   10964, commit b29c606e2; Homebrew) with full Metal ofﬂoad on an Apple M1 Max with 64 GB
+261   of memory, under a ﬁxed model alias, so the harness sends identical requests to every rung. The
+262   single-call ladder and the repeats use 4 slots and an 8,192-token context; the free-form control, the
+263   larger models, the Llama models and the multi-turn runs use 32,768, because reasoning traces
+264   overﬂowed the smaller context; the 16,384-token budget re-run uses 65,536 with two slots. In
+265   every conﬁguration the KV cache is one buffer shared by the slots (kv_unified), so concurrent
+266   requests share the context ﬁgure rather than each owning it. A single call has a median prompt of
+267   252 tokens and a median completion of 155 to 195 tokens (§4.3), so the context setting cannot
+268   affect the single-call arms, and the cross-model comparison in Table 5 is unaffected by the two
+269   settings it mixes. It does affect the multi-turn arm, where trajectories accumulate a median context
+270   of 6,591 to 6,879 tokens per request and four of them together overﬂow the shared cache (§4.6).
+271   Generation is at temperature 0.001, the bfcl-eval default, for both arms. No sampling seed is
+272   ﬁxed: llama-server is run with its default seed of −1, which draws a fresh random seed per
+273   request, so decoding is near-greedy but not bit-identical between runs. The repeat control below
+274   measures what that leaves. For the tool-calling arm, bfcl-eval 2026.3.23 builds the prompt itself
+275   in each model’s own function-calling format and sends it to the server’s raw completions endpoint,
+276   so the server’s --jinja chat template is not involved in those runs; the free-form arm uses the
+277   chat completions endpoint, where the template applies. Throughput, recorded in the lab notebook
+278   rather than computed from the logs, is about 35 tokens per second per slot and 650 tokens per
+279   second of prompt evaluation; the median latency of a single call on the Qwen3-1.7B ladder, from
+280   the result ﬁles, is 4.5 to 6.7 s. Python is 3.12.
+
+                                                       8
+281   3.5 Scoring
+282   BFCL v4 (Patil et al., 2025), simple_python category, deterministic AST matching, run through
+283   the -FC handler of each model so that the model uses its native function-calling format. The strict
+284   verdict is the checker’s own. The coerced verdict is computed afterwards from the score ﬁles, with
+285   no new generation: each strict failure is passed back through BFCL’s
+286   simple_function_checker with string arguments parsed to the type the function schema
+287   declares (analysis/coerced.py in the repository). A quoted integer is parsed only if it is an
+288   integer literal, a quoted list only if it parses as a list, a quoted boolean only if it is true or false;
+289   anything else is left as the string it was, and the checker then compares the parsed value with the
+290   reference exactly as it would a natively typed one, including nested types and optional parameters.
+291   One further step was added in this revision after reading the raw outputs behind the Llama-3.1-8B
+292   decode failures (§4.5): bfcl-eval’s Llama 3.1 handler decodes a single call with Python’s
+293   eval(), which refuses the JSON literals true, false and null that Meta’s tool-call format
+294   allows. A strict decode failure whose raw output json.loads() reads as exactly one {"name":
+295   ..., "parameters": {...}} object is treated as that call and checked like any other;
+296   anything else stays a decode failure. The Qwen3 runs are unchanged by either step: 0 of their 226
+297   strict failures across all rungs are of the coercible kind and 0 are decode failures. Differences
+298   between rungs are tested with McNemar’s exact test on the discordant pairs, corrected within
+299   families, and every accuracy carries a Wilson 95% interval, as deﬁned in §3.2.
+
+
+300   3.6 Reproducibility control
+301   Two rungs of Qwen3-1.7B, Q8_0 and Q4_K_M, were run three times each with the same weights
+302   and settings. This gives the run-to-run variation of the instrument, which is needed before any
+303   difference between rungs can be read as a difference between weights. The control was run on the
+304   1.7B model only; the other four models are single runs and inherit its tolerance as an assumption,
+305   which the Limitations section returns to.
+
+
+306   3.7 Free-form control
+307   The same ﬁve Qwen3-1.7B weight ﬁles, and the three ﬁles of each Llama model, answer 400
+308   GSM8K test questions (Cobbe et al., 2021), drawn at seed 42, through the same server under the
+309   same alias, with a 4,096-token completion budget. Every generation is logged in full so that
+310   scoring under a different extractor is a re-read rather than a re-run. Two extractors are used. Strict
+311   accepts an explicit commitment in any of three forms, “The answer is N”, “#### N”, or
+312   \boxed{N}, and takes the last such commitment in the text, so a boxed number mid-trace
+313   followed by a later “The answer is” yields the later one. Lenient takes the last number in the
+314   visible answer. Our ﬁrst strict rule accepted only the ﬁrst form; on the ﬁrst 59 Q8_0 generations it
+315   would have scored 21 wrong for writing the answer in a box. That rule was a strawman, it was
+316   replaced before any rung was scored (commit 07cee6b, 18 September, 17:56), and the gap it
+317   would have produced is not reported anywhere in this paper.
+
+
+
+                                                         9
+318   3.8 Check against the published leaderboard
+319   Llama-3.1-8B-Instruct at Q8_0 scores 50.00% under the strict checker here, which is far below
+320   what the public leaderboard reports for that model, so the comparison is stated before the results.
+321   The BFCL leaderboard data ﬁle (Gorilla Team, UC Berkeley, 2026), last modiﬁed 13 April 2026
+322   and retrieved on 2026-09-29, lists Llama-3.1-8B-Instruct in prompting mode only, as
+323   “Llama-3.1-8B-Instruct (Prompt)”, at 94.00% on Python simple AST over the full 400 items; it
+324   lists no function-calling row for the model (0 of its 1 Llama-3.1-8B rows). Our run uses the
+325   function-calling handler, in which bfcl-eval builds Meta’s JSON tool-call prompt for Llama 3.1
+326   itself and sends it to the raw completions endpoint of llama-server. The meta-llama
+327   repositories are gated, so the tokenizer and conﬁguration are loaded from the ungated mirrors
+328   unsloth/Llama-3.1-8B-Instruct (snapshot 4699cc75, tokenizer_config.json SHA-256
+329   671ecdff...3465, config.json ad98082c...928b) and unsloth/Llama-3.2-3B-Instruct
+330   (snapshot 006f5dcd, tokenizer_config.json 9ddd255c...7458); the full hashes are in the
+331   lab notebook, and the environment variables are REMOTE_OPENAI_BASE_URL and
+332   REMOTE_OPENAI_TOKENIZER_PATH in run_llama.sh. In that format the full-precision model
+333   writes numeric arguments as quoted strings, which the strict checker rejects, and the handler’s
+334   eval() refuses a bare JSON boolean (§3.5). The coerced score at Q8_0, 93.00% [88.6, 95.8] on
+335   the ﬁrst 200 items, is consistent with the published prompting-mode number, so the gap between
+336   50.00% and 94.00% is the argument-typing habit under the JSON tool-call format as read by this
+337   handler, not the weights or the server. A cross-check of the same GGUF ﬁles through a second
+338   path that renders Meta’s tool template itself (the chat completions endpoint with --jinja and a
+339   tools ﬁeld) has not been run; the Limitations section lists it ﬁrst.
+
+
+340   3.9 Overthinking penalty
+341   Lotﬁ et al. (2026) report that a ﬁxed logit penalty on a curated list of overthinking markers cuts
+342   chain-of-thought length by 12 to 23% while preserving accuracy. We apply a ﬁxed penalty of
+343   −2.0 to the eight Qwen3 tokens for wait, but, alternatively and hmm in both capitalisations, at the
+344   server, and re-run the Qwen3-1.7B ladder at Q4_K_M and Q3_K_M. This approximates their
+345   method with a single ﬁxed λ rather than their tuned value.
+
+
+346   3.10 Reproducibility
+347   Every number in this paper is a macro recomputed from the raw BFCL result and score ﬁles, the
+348   logged generations, the server logs and the Ollama manifest of the FP16 source, with one
+349   exception: the throughput ﬁgures in §3.4 are recorded from the lab notebook. The scripts, all in the
+350   repository named in the Data Availability statement, are: analysis/paper_numbers.py, which
+351   writes paper/tables/numbers.tex and every table from runs/; analysis/coerced.py, the
+352   coerced re-score and the failure classiﬁcation; analysis/figure.py, Figure 1; run_ladder.sh,
+353   which rebuilds the Qwen3-1.7B ladder from the FP16 source and scores it; run_model.sh, which
+354   does the same for Qwen3-8B, Qwen3-14B and the multi-turn category; run_llama.sh and
+355   run_gsm8k_model.sh, which build and score the two Llama models on both arms; and
+
+
+                                                      10
+                          Rung      Accuracy per run   Range (pp) Max per-question ﬂips
+                          Q8_0   91.75, 91.50, 91.50         0.25              1 of 400
+                          Q4_K_M 92.00, 91.50, 92.00         0.50              4 of 400
+
+      Table 2: Run-to-run variation with the same weights and settings, Qwen3-1.7B, simple_python,
+      n = 400.
+
+
+356   run_repeats.sh, run_gsm8k.sh, run_budget.sh and run_h4.sh for the reproducibility,
+357   free-form, budget and penalty arms. The GGUF weight ﬁles are not in the archive;
+358   run_ladder.sh and run_model.sh rebuild them from the published FP16 checkpoints.
+
+
+359   4    Results
+
+360   4.1 The instrument is reproducible
+361   Table 2 gives three runs of two rungs with the same weights and settings. Q8_0 moved by 0.25
+362   points across three runs and Q4_K_M by 0.50. At the level of individual questions, at most 1 of
+363   400 verdicts changed between two Q8_0 runs and at most 4 between two Q4_K_M runs. The
+364   instrument is close to deterministic, so any difference between rungs larger than about 0.50 points
+365   can be attributed to the weights rather than to run-to-run variation.
+
+
+366   4.2 Flat to four bits, a cliff at three
+367   Table 3 is the ladder. From Q8_0 down to Q4_K_M the accuracy sits in a band of under three
+368   points and no rung differs from Q8_0 at any conventional level: Q4_K_M is at 92.00% [88.9,
+369   94.3] against Q8_0’s 91.75% [88.6, 94.1], a difference of +0.25 points [−2.3, +2.8] with a
+370   McNemar p of 1.000, while being 59% of the ﬁle size. Q6_K scores above Q8_0 and Q5_K_M
+371   below it, and neither difference survives paired testing, so the apparent non-monotonicity in the
+372   raw numbers is within the instrument’s noise.
+373   Q3_K_M is a different case. It loses 30 questions that Q8_0 gets right and recovers 11, a net loss
+374   of 4.75 points [−7.9, −1.6] at p = 0.004, Holm-adjusted 0.017 within the four tests of this ladder.
+375   That drop is about 10 times the largest run-to-run range in Table 2, which places the tool-calling
+376   ﬂoor for this model at Q4_K_M and the cliff rung at Q3_K_M. Of the 30 lost items, 21 are calls
+377   with a wrong argument value and 1 has a wrong type; 5 emit no call at all, either prose in place of
+378   a call, as in the GCD item of the introduction, or a trace that never reaches the call, which BFCL’s
+379   Qwen handler decodes as an empty call list and scores as a wrong call count rather than a decode
+380   failure; 3 name a corrupted version of the right function.
+
+
+
+
+                                                       11
+                Rung      Size (GB) Accuracy [95% CI]       vs. Q8_0 Lost Gained McNemar p (Holm)
+                Q8_0            2.2   91.75% [88.6, 94.1]    baseline
+                Q6_K            1.7   93.50% [90.6, 95.5]   +1.75 pp     6   13   0.167 (0.501)
+                Q5_K_M          1.5   90.75% [87.5, 93.2]   −1.00 pp    10    6   0.454 (0.909)
+                Q4_K_M          1.3   92.00% [88.9, 94.3]   +0.25 pp    13   14   1.000 (1.000)
+                Q3_K_M          1.1   87.00% [83.3, 89.9]   −4.75 pp    30   11   0.004 (0.017)
+
+      Table 3: The quantization ladder for Qwen3-1.7B on simple_python, n = 400 per rung, all
+      rungs from one FP16 source, one run per rung. Brackets after an accuracy are Wilson 95% inter-
+      vals. Lost and gained count questions that ﬂip against Q8_0; p is McNemar’s exact test on those
+      discordant pairs, followed by the Holm-adjusted p within this ladder’s four tests, in bold where
+      the adjusted value is below 0.05.
+
+
+381   4.3 The free-form ﬂoor on the same weights
+382   Figure 1 puts both tasks on one axis and Table 4 gives the numbers. The tool-calling line barely
+383   moves while the free-form line drops sharply at the same rung, and the right panel shows the
+384   reason. The free-form ﬂoor sits exactly where the tool-calling ﬂoor sits, at Q4_K_M, and nowhere
+385   else: no rung above Q3_K_M differs from Q8_0 under paired testing. So H1 fails, and it fails in
+386   the opposite direction. At Q3_K_M free-form accuracy falls by 39.50 points, against 4.75 for tool
+387   calling.
+388   The mechanism is in the last two columns of the table. Q8_0 already leaves 28 of 400 generations
+389   (7%) at the 4,096-token budget, all of them without a committed answer. At Q3_K_M, 213 of 400
+390   reach the budget while still inside the chain of thought: 164 contain no committed answer, 20
+391   commit to a wrong one, and 29 commit to the right answer and keep reasoning past it, so they
+392   count as correct. The 187 correct answers at this rung are 158 ﬁnished generations plus those 29.
+393   The median completion length at this rung is the budget itself. This is the behaviour Lotﬁ et al.
+394   (2026) report under GPTQ and AWQ, reproduced here on the deployed format with a
+395   deterministic scorer. Among the 187 generations that did ﬁnish, accuracy is 84.5%, against 92.7%
+396   for ﬁnished generations at Q8_0, so a smaller reasoning loss of about 8.2 points sits underneath
+397   the collapse. A tool call does not pay that cost. From the same result ﬁles that carry the verdicts,
+398   the median tool-call completion is 195 tokens at Q8_0 and 155 at Q3_K_M, the 90th percentile
+399   411 and 353, and 1 of 400 requests at Q3_K_M reached the budget. The three-bit weights also
+400   change how the call is produced: 178 of 400 Q3_K_M generations skip the reasoning block
+401   altogether, against 0 at Q8_0 and 0 at Q4_K_M, and those score 87.1% against 86.9% for the ones
+402   that reason ﬁrst. Either way the generation ends before the instability that sinks the mathematics
+403   has room to develop.
+404   H3 as written. The hypothesis ﬁle said the drop measured by AST matching would be smaller
+405   than the drop measured on the free-form set under strict extraction by at least ﬁve points. At
+406   Q3_K_M the two drops are 4.75 and 39.50 points, a difference of 34.75, so H3 holds as written; at
+407   the rungs above Q3_K_M both drops are within the instrument’s noise and the hypothesis has
+408   nothing to bound. What H3 was meant to bound, how much of a published free-form drop is the
+409   parser, is a separate observation that the ﬁle did not register: the gap between strict and lenient
+410   scoring is at most 0.50 points at any rung. Once the strict extractor accepts the commitment
+
+
+                                                            12
+                           (a) same weights, two tasks                                                                           (b) where the length goes
+                     100                                                                                                   1.0
+                                                                                                                                        tool call, Q8_0
+                      90                                                                                                                tool call, Q3_K_M
+                                                                                                                           0.8
+
+
+
+
+                                                                                                 fraction of generations
+                                                                                                                                        math, Q8_0
+                                                                                                                                                                      213 of 400 math
+
+
+
+                                                                                                                                                                                          4,096-token budget
+                      80                                                                                                                math, Q3_K_M
+
+
+
+      accuracy (%)
+                                                                                                                                                                      generations stuck
+                                                                                                                           0.6
+                                                                        -4.75 pp                                                                                             at the cap
+                      70
+                                                                                                                           0.4
+                      60
+                                   tool calling, Qwen3-1.7B
+                                                                  -39.50 pp                                                0.2
+                      50           free-form math, same weights
+                                   tool calling, Qwen3-8B
+                      40                                                                                                   0.0
+                           Q8_0          Q6_K         Q5_K_M       Q4_K_M          Q3_K_M                                                    102                     103
+                           8-bit          6-bit          5-bit       4-bit          3-bit                                                completion length (tokens, log scale)
+
+
+      Figure 1: (a) Accuracy across the quantization ladder on identical weight ﬁles: tool calling on
+      BFCL and free-form mathematics on GSM8K for Qwen3-1.7B, with Qwen3-8B tool calling
+      dashed. Both ﬂoors sit at Q4_K_M; the free-form drop at Q3_K_M is about eight times the tool-
+      calling drop. (b) Cumulative distribution of per-request completion length at Q8_0 and Q3_K_M
+      for each task, from the result ﬁles. Tool calls are short at both rungs, and shorter at Q3_K_M be-
+      cause 178 of 400 skip the reasoning block, while math generations at Q3_K_M pile up against the
+      4,096-token budget and 213 of 400 reach it.
+
+
+411   format reasoning models emit, the failures at Q3_K_M are generations with no committed answer,
+412   or a wrong one, not answers a parser failed to ﬁnd. The mechanism is truncation, not extraction.
+413   Earlier drafts of this paper scored H3 on that gap and reported it as a null; the registered statistic is
+414   the one above.
+415   The budget. A collapse driven by truncation could be an artefact of the 4,096-token cap rather
+416   than of the weights. We re-ran the 213 Q3_K_M generations that hit the cap with a budget of
+417   16,384 tokens, four times the original. Of the 196 that completed without a server error, 151
+418   (77%) hit the larger cap as well, and 48 (24%) reached a correct answer. Given four times the
+419   room, the three-bit model mostly keeps thinking. A larger budget converts most of the truncations
+420   into longer truncations.
+
+
+421   4.4 Across models, strict and coerced
+422   Table 5 gives every model at Q8_0, Q4_K_M and Q3_K_M under both verdicts; the Qwen3-1.7B
+423   rows repeat Table 3. On Qwen3-8B there is no cliff. Q3_K_M scores 96.50% [93.0, 98.3] against
+424   95.50% [91.7, 97.6] at Q8_0, a difference of +1.00 points at p = 0.688, and Q4_K_M is likewise
+425   indistinguishable from the baseline. Qwen3-14B repeats the pattern: 96.00% at Q8_0, 96.00% at
+426   Q4_K_M and 96.50% at Q3_K_M, with the Q3_K_M difference at +0.50 points and p = 1.000.
+427   On this family the three-bit cliff that binds at 1.7B has moved below the ladder by 8B and stays
+428   there at 14B, which is the direction the free-form literature reports for larger models and is now
+429   shown for the call itself at two sizes. The coerced columns for the three Qwen3 models are
+430   identical to the strict ones, because none of their strict failures is a quoted value of the right type or
+
+
+                                                                                            13
+          Rung     Strict [95% CI]       Lenient      Gap    vs. Q8_0 McNemar p (Holm) Median tokens Truncated Truncated, correct
+          Q8_0     86.25% [82.5, 89.3]   86.50%    +0.25 pp  baseline                            1065        28                0
+          Q6_K     86.50% [82.8, 89.5]   86.50%    +0.00 pp +0.25 pp    1.000 (1.000)            1102        32                0
+          Q5_K_M   88.75% [85.3, 91.5]   89.25%    +0.50 pp +2.50 pp    0.164 (0.492)             955        21                0
+          Q4_K_M   85.50% [81.7, 88.6]   85.75%    +0.25 pp −0.75 pp    0.736 (1.000)            1048        34                0
+          Q3_K_M   46.75% [41.9, 51.6]   46.75%    +0.00 pp −39.50 pp   <0.0001 (<0.0001)        4096       213               29
+
+
+      Table 4: The free-form control, GSM8K, Qwen3-1.7B, n = 400 per rung, identical weight ﬁles
+      to Table 3. Brackets are Wilson 95% intervals on the strict score. Gap is lenient minus strict. p is
+      McNemar’s exact test against Q8_0 with the Holm-adjusted value in brackets, bold where below
+      0.05. Median tokens is the completion length; the budget was 4,096. Truncated counts genera-
+      tions that reached the budget, and the last column those among them that had already committed
+      to the correct answer.
+
+
+431   an undecoded JSON call. Both Llama models are single runs at n = 200, and their intervals are
+432   correspondingly wider than the 1.7B ones.
+433   Table 6 puts a size on “no detectable loss” at four bits. For each model it gives the paired Q8_0 to
+434   Q4_K_M difference with its 95% interval and the minimum detectable difference at the observed
+435   discordance. Under the coerced verdict no lower interval end is below −5.2 points and the
+436   minimum detectable difference runs from 2.8 to 3.7 points; under the strict verdict the widest case
+437   is Llama-3.2-3B at −7.1. So four bits shows no loss larger than about three to ﬁve points on any
+438   model here, depending on the model and the verdict, and the design cannot exclude a loss of that
+439   size on the n = 200 models.
+
+
+440   4.5 A second family
+441   The Qwen3 pattern does not transfer to the Llama models, and the two verdicts disagree about
+442   how much of what happens is capability. Under the strict checker Llama-3.2-3B loses 4.00 points
+443   at Q4_K_M (p = 0.021, 9 lost against 1 gained) and 5.50 at Q3_K_M (p = 0.007). Within this
+444   model’s family of four tests the Holm-adjusted values are 0.064 and 0.030, so under strict scoring
+445   its cliff rung is Q3_K_M, and the four-bit loss is suggestive, from one run, and needs a repeat
+446   before it is read as a cliff. Under the coerced checker the same runs lose 2.50 and 2.50 points, at
+447   p = 0.125 and p = 0.180, and the model has no cliff rung on the ladder. The difference is in
+448   Table 7: of its strict failures, 3 at Q8_0, 6 at Q4_K_M and 9 at Q3_K_M are the right value in a
+449   quoted string, so the strict loss overstates the loss in call correctness: 4.00 against 2.50 points at
+450   Q4_K_M and 5.50 against 2.50 at Q3_K_M, the remainder being a change in how the compressed
+451   weights type their arguments.
+452   Llama-3.1-8B is the extreme case. Its Q8_0 weights score 50.00% under the strict checker;
+453   Q4_K_M and Q3_K_M score 63.00% and 71.50%, both at p < 0.0001 against Q8_0, an inversion
+454   of the expected order. Table 7 gives the reason in two parts. Of the 100 Q8_0 strict failures, 90 are
+455   type errors, and 86 of the 100 pass the checker once the quoted value is parsed: the model names
+456   the right function and the right value and writes the number in quotes, as in {"base": "10",
+457   "height": "5"} for a triangle with base 10 and height 5. A quoted number appears in 61 of
+458   200 Q8_0 outputs, 35 at Q4_K_M and 12 at Q3_K_M, while outputs with a bare number rise from
+
+
+                                                                        14
+      Model        Rung       n Strict [95% CI]     vs. Q8_0 p (Holm)          Coerced [95% CI]   vs. Q8_0 Lost/gained p (Holm)
+      Qwen3-1.7B   Q8_0   400 91.75% [88.6, 94.1]    baseline                  91.75% [88.6, 94.1] baseline
+      Qwen3-1.7B   Q4_K_M 400 92.00% [88.9, 94.3]   +0.25 pp 1.000 (1.000)     92.00% [88.9, 94.3] +0.25 pp     13/14 1.000 (1.000)
+      Qwen3-1.7B   Q3_K_M 400 87.00% [83.3, 89.9]   −4.75 pp 0.004 (0.017)     87.00% [83.3, 89.9] −4.75 pp     30/11 0.004 (0.017)
+      Qwen3-8B     Q8_0   200 95.50% [91.7, 97.6]    baseline                  95.50% [91.7, 97.6] baseline
+      Qwen3-8B     Q4_K_M 200 96.50% [93.0, 98.3]   +1.00 pp 0.625 (1.000)     96.50% [93.0, 98.3] +1.00 pp       1/3 0.625 (1.000)
+      Qwen3-8B     Q3_K_M 200 96.50% [93.0, 98.3]   +1.00 pp 0.688 (1.000)     96.50% [93.0, 98.3] +1.00 pp       2/4 0.688 (1.000)
+      Qwen3-14B    Q8_0   200 96.00% [92.3, 98.0]    baseline                  96.00% [92.3, 98.0] baseline
+      Qwen3-14B    Q4_K_M 200 96.00% [92.3, 98.0]   +0.00 pp 1.000 (1.000)     96.00% [92.3, 98.0] +0.00 pp       3/3 1.000 (1.000)
+      Qwen3-14B    Q3_K_M 200 96.50% [93.0, 98.3]   +0.50 pp 1.000 (1.000)     96.50% [93.0, 98.3] +0.50 pp       2/3 1.000 (1.000)
+      Llama-3.2-3B Q8_0   200 92.00% [87.4, 95.0]    baseline                  93.50% [89.2, 96.2] baseline
+      Llama-3.2-3B Q4_K_M 200 88.00% [82.8, 91.8]   −4.00 pp 0.021 (0.064)     91.00% [86.2, 94.2] −2.50 pp       6/1 0.125 (0.250)
+      Llama-3.2-3B Q3_K_M 200 86.50% [81.1, 90.6]   −5.50 pp 0.007 (0.030)     91.00% [86.2, 94.2] −2.50 pp       7/2 0.180 (0.250)
+      Llama-3.1-8B Q8_0   200 50.00% [43.1, 56.9]  baseline                   93.00% [88.6, 95.8] baseline
+      Llama-3.1-8B Q4_K_M 200 63.00% [56.1, 69.4] +13.00 pp <0.0001 (<0.0001) 93.00% [88.6, 95.8] +0.00 pp        2/2 1.000 (1.000)
+      Llama-3.1-8B Q3_K_M 200 71.50% [64.9, 77.3] +21.50 pp <0.0001 (<0.0001) 91.50% [86.8, 94.6] −1.50 pp        6/3 0.508 (1.000)
+
+
+      Table 5: Tool calling across ﬁve models on simple_python, under the strict BFCL verdict and
+      the type-coerced verdict of §3.2. Qwen3-1.7B at n = 400 (rows from Table 3); the other four at
+      n = 200, one run per rung. Brackets after an accuracy are Wilson 95% intervals. Each model is
+      compared against its own Q8_0 by McNemar’s exact test; p is followed by the Holm-adjusted p
+      within that model’s family, in bold where the adjusted value is below 0.05. Lost/gained are for the
+      coerced verdict.
+
+
+459   82 to 134. The second part is the handler. BFCL’s decoder rejects 3, 6 and 14 outputs down the
+460   ladder; 2, 5 and 13 of those are well-formed JSON tool calls in Meta’s format that contain a bare
+461   true or false, which the handler’s eval() does not accept (§3.5). The same weights write a bare
+462   boolean in 2, 5 and 13 outputs and a quoted one in 20, 18 and 9, so the rise in decode failures is the
+463   same typing habit seen through the parser. The coerced verdict, which parses the quoted values
+464   and re-reads the JSON calls, restores the expected order and ﬂattens it: 93.00% [88.6, 95.8],
+465   93.00% [88.6, 95.8] and 91.50% [86.8, 94.6] down the ladder, a difference of +0.00 points at
+466   Q4_K_M (2 lost, 2 gained) and a loss of 1.50 at Q3_K_M (6 lost, 3 gained, p = 0.508). Neither is
+467   a detectable loss. Earlier drafts of this paper, which did not re-read the decode failures, reported a
+468   coerced loss of seven points at Q3_K_M on this model; most of that loss was the parser. Free-form
+469   accuracy on the same ﬁles falls 3.25 points at Q4_K_M (Holm p = 0.041) and 7.75 at Q3_K_M
+470   (Holm p = 0.0001). Length plays no part in either Llama model: GSM8K completions have a
+471   median of 185 to 220 tokens, and at most 5 of 400 reach the budget at any rung, so the run-away
+472   behind the Qwen3 collapse cannot occur and the free-form losses here are ordinary precision loss.
+473   What the second family adds is one ﬁnding and two warnings. The ﬁnding is that quantization
+474   changes argument typing before it changes call correctness: on both Llama models the count of
+475   coercible failures moves with the rung while the coerced accuracy at Q4_K_M does not differ
+476   from Q8_0. The ﬁrst warning is that a strict schema score can move in either direction under
+477   quantization, because it measures a formatting habit as much as a capability, and a reader given
+478   only the strict column of Table 5 would conclude that compressing Llama-3.1-8B improves it by
+479   21.50 points. The second is that a checker’s decode-failure count can be the checker’s own parser:
+480   a reader given the failure counts but not the raw outputs would conclude that three-bit weights
+481   stop producing parseable calls, when they produce calls in the format the model was trained on
+
+
+                                                                   15
+        Model           Verdict               n Lost Gained Difference [95% CI] (pp)                            p (Holm) MDD (pp)
+        Qwen3-1.7B strict = coerced 400            13        14    +0.25 [−2.3, +2.8]                 1.000 (1.000)               3.6
+        Qwen3-8B     strict = coerced 200           1         3    +1.00 [−1.2, +3.2]                 0.625 (1.000)               2.8
+        Qwen3-14B strict = coerced 200              3         3    +0.00 [−2.6, +2.6]                 1.000 (1.000)               3.4
+        Llama-3.2-3B strict           200           9         1    −4.00 [−7.1, −0.8]                 0.021 (0.064)               4.4
+        Llama-3.2-3B coerced          200           6         1    −2.50 [−5.2, +0.2]                 0.125 (0.250)               3.7
+        Llama-3.1-8B strict           200           3        29    +13.00 [+7.6, +18.2]          <0.0001 (<0.0001)                7.9
+        Llama-3.1-8B coerced          200           2         2    +0.00 [−2.2, +2.2]                 1.000 (1.000)               2.8
+
+      Table 6: The four-bit bound. For each model, the paired difference between Q4_K_M and Q8_0
+      with the adjusted Wald 95% interval of Agresti and Min (2005), the McNemar p with the Holm-
+      adjusted value in brackets, and the minimum detectable difference (MDD): the smallest loss the
+      test would detect at α = 0.05 with 80% power at the discordance observed on that model (Connor,
+      1987). For the Qwen3 models the coerced verdict equals the strict one.
+
+      Model      Rung       Strict failures Type errors Decode failures JSON calls Coercible GSM8K strict [95% CI] vs. Q8_0 p (Holm)
+      Llama-3.2-3B Q8_0              16           6                0         0          3 84.00% [80.1, 87.3]      baseline
+      Llama-3.2-3B Q4_K_M            24          10                0         0          6 81.25% [77.1, 84.8]     −2.75 pp 0.126 (0.126)
+      Llama-3.2-3B Q3_K_M            27          13                0         0          9 75.50% [71.1, 79.5]     −8.50 pp <0.0001 (0.0001)
+      Llama-3.1-8B Q8_0             100          90                3         2        86 91.00% [87.8, 93.4]       baseline
+      Llama-3.1-8B Q4_K_M            74          61                6         5        60 87.75% [84.2, 90.6]      −3.25 pp 0.041 (0.041)
+      Llama-3.1-8B Q3_K_M            57          32               14        13        40 83.25% [79.3, 86.6]      −7.75 pp <0.0001 (0.0001)
+
+
+      Table 7: The second family. Failure types on simple_python (n = 200 per rung, one run): strict
+      failures, of which type errors and decode failures, the decode failures whose raw output is one
+      well-formed JSON call, and the strict failures that pass the coerced checker. GSM8K strict accu-
+      racy, n = 400, with Wilson 95% intervals, each model against its own Q8_0 by McNemar’s exact
+      test, with the Holm-adjusted p in brackets.
+
+
+482   that this handler does not read. Anyone scoring tool calls under compression should report the
+483   failure types, read the raw outputs behind the decode failures, and put a coerced score beside the
+484   strict one.
+
+
+485   4.6 Multi-turn trajectories
+486   The hypothesis ﬁle predicted that multi-turn trajectories, where an error in one call corrupts the
+487   state for every call after it, would degrade at least twice as fast as single calls. Table 8 gives
+488   BFCL’s multi_turn_base on Qwen3-1.7B, n = 200, which is the whole category: 17.00% at
+489   Q8_0, 13.50% at Q4_K_M and 1.50% at Q3_K_M. Those numbers cannot be read as a property
+490   of the weights. The server for this arm ran 4 slots on a 32,768-token KV cache that the slots share,
+491   and a request whose accumulated context did not ﬁt beside the other three was refused with
+492   “Context size has been exceeded”; bfcl-eval records the refusal as the trajectory’s result and the
+493   checker scores it as a failure. That happened to 46, 59 and 137 of the 200 trajectories at Q8_0,
+494   Q4_K_M and Q3_K_M; a further 2, 1 and 2 ended in a handler exception on a malformed call,
+495   which is an ordinary failure, so 48, 60 and 139 trajectories carry no completed run. On the
+496   trajectories that ran to completion, accuracy is 34 of 152 (22.4%), 27 of 140 (19.3%) and 3 of 61
+
+                                                                       16
+              Rung       n Accuracy, all [95% CI]    vs. Q8_0 Lost/Gained McNemar p (Holm) Aborted Accuracy, completed
+              Q8_0   200 17.00% [12.4, 22.8]          baseline                                  48      34/152 (22.4%)
+              Q4_K_M 200 13.50% [9.4, 18.9]          −3.50 pp       16/9 0.230 (0.230)          60      27/140 (19.3%)
+              Q3_K_M 200 1.50% [0.5, 4.3]           −15.50 pp       32/1 <0.0001 (<0.0001)     139         3/61 (4.9%)
+
+
+      Table 8: Multi-turn tool calling, BFCL multi_turn_base, Qwen3-1.7B, n = 200 per rung (the
+      whole category), one run. Accuracy over all trajectories, with Wilson 95% intervals, as BFCL
+      scores it; McNemar’s p against Q8_0 with the Holm-adjusted value in brackets. Aborted counts
+      trajectories that ended in a server context error or a handler exception and were scored as failures;
+      the last column is the accuracy on the trajectories that ran to completion. The rung comparison is
+      confounded by the aborts (§4.6).
+
+
+497   (4.9%), but the completed set at Q3_K_M is the third of trajectories that stayed short, so that
+498   comparison is biased in its own way. On the completed trajectories the per-request completion has
+499   a median of 268, 193 and 186 tokens, and the accumulated context per request a median of 6,591,
+500   6,666 and 6,879 tokens, a 90th percentile of 8,484, 9,102 and 10,399, and a maximum of 15,237,
+501   15,862 and 22,539: no single trajectory needed the whole cache, and four together did. Whether
+502   three-bit weights push more trajectories over the limit because they generate more per turn, or
+503   because the aborts fell on them by scheduling, cannot be separated in this run. The rising
+504   90th-percentile context points to the ﬁrst; the quarter of Q8_0 trajectories lost to the same error
+505   shows the second is large. H5 is therefore not evaluable from this run. Earlier drafts of this paper
+506   reported it as supported by a wide margin, on the all-trajectory numbers, without having noticed
+507   the aborts. The arm has to be re-run with a context each trajectory owns, one slot or a per-slot
+508   cache, before the hypothesis can be read either way.
+
+
+509   4.7 Does the overthinking penalty transfer
+510   The penalty has no measurable effect. With it, Qwen3-1.7B scores 92.00% at Q4_K_M and
+511   87.00% at Q3_K_M, identical to the unpenalised runs to two decimals; at each rung 2 questions
+512   ﬂip one way and 2 the other, within the repeat-control range of Table 2. H4 predicted a loss of at
+513   least three points and there is no loss. The explanation follows from §4.3: the penalty acts on
+514   tokens a reasoning trace emits and a tool call does not, so on a 155-token output there is almost
+515   nothing for it to act on. This agrees with the authors’ own scope statement that the marker list was
+516   curated for free-form English reasoning. Both the failure they describe and the ﬁx for it live in the
+517   reasoning trace, and the tool call contains very little of that trace.
+
+
+518   4.8 The hypotheses against their written thresholds
+519   H1 (the schema breaks ﬁrst) was written on schema validity, the share of outputs the checker
+520   decodes as a call, falling below 95% of its reference value at a higher bit-width than free-form
+521   accuracy does. On Qwen3-1.7B schema validity is 99.75% at Q8_0 and never below 98.75% at
+522   any rung, against a threshold of 94.76%, so it never triggers; free-form accuracy crosses its own
+523   95% line (81.94%) at Q3_K_M. Under the registered statistic the schema does not break at all on
+
+
+                                                                  17
+          Model          Failures Q8_0 Structural Share (%) Failures Q3_K_M Structural Share (%) Change (pp)
+          Qwen3-1.7B              33          3       9.1               52          8      15.4        +6.3
+          Qwen3-8B                 9          0       0.0                7          3      42.9       +42.9
+          Qwen3-14B                8          0       0.0                7          0       0.0        +0.0
+          Llama-3.2-3B            16          4      25.0               27          4      14.8       −10.2
+          Llama-3.1-8B           100          3       3.0               57         14      24.6       +21.6
+
+      Table 9: H2 as written: the structural share of strict failures at Q8_0 and Q3_K_M per model,
+      from BFCL’s error categories. Structural is decode failure, wrong function name, wrong call
+      count or missing parameter; the rest are wrong values or types. The threshold was a rise of 15
+      points. On Llama-3.1-8B 13 of the 14 structural failures at Q3_K_M are JSON calls the handler
+      did not decode.
+
+
+524   this ladder, and under AST accuracy both ﬂoors sit at Q4_K_M. H1 is not supported under either
+525   reading.
+526   H2 (failure mode shifts) said the share of failures that are structural, meaning no call decoded, a
+527   wrong function name, a wrong number of calls or a missing parameter, rather than semantic,
+528   meaning a wrong value or type, would rise by at least 15 points from Q8_0 to Q3_K_M. Table 9
+529   gives it for every model from BFCL’s own error categories. On Qwen3-1.7B it rises from 9.1% to
+530   15.4%, +6.3 points, below the threshold; on Qwen3-14B and Llama-3.2-3B it does not rise; on
+531   Qwen3-8B it rises by +42.9 points on 7 failures; on Llama-3.1-8B it rises by +21.6 points by
+532   BFCL’s categories and by +0.8 once the 13 JSON calls are decoded. The hallucinated-function
+533   rate, the third registered metric, is at most 0.75% on any rung of any model (3 of 400 calls on
+534   Qwen3-1.7B at Q3_K_M, each a corrupted spelling of the right name). H2 is not supported on the
+535   primary model.
+536   H3 holds as written (§4.3), and on the Llama models too: the coerced AST drop at Q3_K_M is
+537   smaller than the strict free-form drop by 6.00 points on Llama-3.2-3B and 6.25 on Llama-3.1-8B.
+538   H4 predicted a loss of at least three points under the penalty and found 0.00 (§4.7). H5 cannot be
+539   evaluated from this run (§4.6).
+
+
+540   5      Discussion
+541   Of the ﬁve hypotheses, one held as written, three did not, and one cannot be read from this run.
+542   H1, that the schema would break ﬁrst, reversed under both its registered statistic and AST
+543   accuracy. H2, that failures would turn structural, moved +6.3 points on the primary model against
+544   a threshold of 15. H3, that the AST drop would be smaller than the strict free-form drop by at least
+545   ﬁve points, held by 34.75 points; the separate question it was meant to bound, how much of a
+546   free-form drop is the parser, has the answer 0.50 points at most. H4, that the overthinking penalty
+547   would cost schema compliance, found a change of 0.00 points. H5, on multi-turn ampliﬁcation, is
+548   confounded by a shared server cache and is reported as such rather than as the wide-margin
+549   support earlier drafts claimed.
+550   The tool-calling ﬂoor is a property of the model, not of the format. At four bits no model shows a
+
+
+                                                            18
+551   loss larger than the intervals in Table 6 allow, which is three to ﬁve points depending on the model
+552   and the verdict, and the coerced verdict at Q4_K_M sits within 2.50 points of Q8_0 on every
+553   model; three bits costs Qwen3-1.7B 4.75 points and Llama-3.2-3B 5.50 strict points, and costs
+554   Qwen3-8B, Qwen3-14B and Llama-3.1-8B nothing detectable at these sample sizes. The
+555   mechanism that damages free-form reasoning at three bits on Qwen3, a chain of thought that runs
+556   past its budget, does not reach a single tool call because the call is over long before the run-away
+557   starts.
+558   On the measurement itself, three points for another group. First, report the failure types. The
+559   Llama-3.1-8B inversion in the strict column of Table 5 would read as a broken harness to anyone
+560   who did not see Table 7, and it took a re-score of the existing ﬁles, not a new run, to show that 86
+561   of 100 failures were the right number in quotes. Second, read the raw outputs behind a checker’s
+562   decode failures: 13 of 14 here were the checker’s parser, and a hypothesis about structural failure
+563   (H2) would have been declared supported on that model without the reading. Third, measure the
+564   instrument, and read its logs. Three runs with the same weights moved by at most 0.50 points
+565   (Table 2); without that ﬁgure none of the other differences could be attributed to anything. The
+566   multi-turn arm is the counter-example: a server error recorded in every result ﬁle went unread
+567   through two drafts, and the arm’s headline number was the error rate.
+568   Practical reading. For anyone deploying an agent on a laptop: four bits shows no single-call loss
+569   larger than about three to ﬁve points on any model measured here, which is the bound the sample
+570   sizes give and not a guarantee of zero; three bits costs Qwen3-1.7B and, under strict scoring,
+571   Llama-3.2-3B; the bit-width should be measured on the model being shipped rather than assumed
+572   from another family; a strict schema score should be read together with a coerced one and the
+573   failure types; and the serving conﬁguration, not only the weights, decides whether a multi-turn
+574   agent ﬁnishes, since the multi-turn arm here was decided by a shared cache before the weights had
+575   a say. A model that emits malformed or wrong tool calls can take real actions, so agents should be
+576   tested at the exact quantization and context conﬁguration they ship with.
+577   Limitations. Three sizes of one model family and two sizes of a second, on the easiest BFCL
+578   category plus one multi-turn set for Qwen3-1.7B only, on one hardware platform and one
+579   inference server. The hypotheses were written in a ﬁle whose ﬁrst commit postdates the ﬁrst
+580   ladder, so their priority rests on the author’s record. FP16 was the planned reference arm and was
+581   not run; every comparison is against Q8_0. The ladder is one quantization family; GPTQ, AWQ
+582   and the other research methods are deliberately out of scope, and multilingual degradation is
+583   excluded because Marchisio et al. (2024) already cover it. The reproducibility control was run on
+584   two rungs of one model rather than on every rung of every model, so the tolerance of 0.50 points
+585   is measured on Qwen3-1.7B and assumed for the other four; the Llama-3.2-3B strict result at
+586   Q4_K_M rests on 9 lost against 1 gained from a single run and does not survive the within-model
+587   correction, and a repeat on that model is the second thing we would add. Four of the ﬁve models
+588   were scored on the ﬁrst 200 items of the category, which halves their power relative to the 1.7B
+589   ladder; the minimum detectable differences in Table 6 are the consequence. The free-form control
+590   uses a 4,096-token budget; the 16,384-token re-run shows that a larger budget recovers few of the
+591   213 truncated generations. The Llama-3.1-8B typing habit was diagnosed from the score ﬁles, the
+592   raw outputs and the published prompting-mode number, not by re-running the weights on a
+593   second server or through a second tool-template path; that cross-check is the ﬁrst thing we would
+
+
+                                                       19
+594   add. The overthinking penalty is one ﬁxed λ rather than the authors’ tuned value. The multi-turn
+595   arm is confounded by a shared KV cache and has to be re-run with a per-trajectory context; until
+596   then it says nothing about the weights. Latency was recorded for the 1.7B ladder only.
+
+
+597   6    Conclusions
+598   We expected a function signature, having no slack, to be the ﬁrst thing quantization breaks. On the
+599   deployed format, scored deterministically, it was the output that held up best. For Qwen3-1.7B the
+600   tool-calling ﬂoor and the free-form ﬂoor sit at the same rung, Q4_K_M, but the call loses 4.75
+601   points at Q3_K_M where the mathematics loses 39.50, and the difference is length: three-bit
+602   weights make the chain of thought grow past the token budget, and a call is complete long before
+603   that happens. On Qwen3-8B and Qwen3-14B there is no tool-calling cliff at any rung. On the
+604   Llama family the strict score moves in both directions because compression changes how the
+605   models type their arguments, and part of what the checker reports as decode failure is its own
+606   parser; scored on the parsed value, four bits costs neither Llama model detectable accuracy and
+607   three bits costs Llama-3.1-8B 1.50 points, not detectable at n = 200. A fair extractor changes at
+608   most 0.50 points, and a penalty designed for reasoning traces ﬁnds little to act on in a call. The
+609   bit-width an agent can tolerate has to be measured on the model being shipped, with the bound the
+610   sample size gives stated beside the result, and the damage quantization does to long reasoning
+611   does not carry over to the tool call.
+
+
+612   Additional Information and Declarations
+613   Competing Interests. The author is employed full time as a software engineer at Amazon (2022
+614   to present). Amazon had no involvement in this work, which was done independently, on the
+615   author’s own hardware and time, and the work is not afﬁliated with that employer; none of the
+616   models, quantization tools, benchmarks or inference servers evaluated is an Amazon product. The
+617   author has no ﬁnancial or other interest in any of them, and none of their developers was involved
+618   in the study.
+619   Author Contributions. Akshay Kumar conceived and designed the experiments, performed the
+620   experiments, analyzed the data, prepared ﬁgures and tables, authored and reviewed drafts of the
+621   article, and approved the ﬁnal draft.
+622   Funding. The author received no funding for this work. All computation ran on the author’s own
+623   hardware.
+624   Use of generative AI. A large language model coding assistant (Claude Code, Anthropic) was
+625   used to draft run scripts and analysis code, to draft and revise text, and to check citations against
+626   their sources; the lab notebook in the repository records which entries were written with it. The
+627   author reviewed every script, number and sentence and is responsible for the content.
+628   Preprint. No preprint of this manuscript is public. An earlier version was submitted to arXiv on
+629   24 September 2026 and was not accepted for announcement; it is not available anywhere.
+
+
+                                                        20
+630   Data Availability. The code, run scripts, every raw BFCL result and score ﬁle, every GSM8K
+631   generation, the server logs, the hypothesis ﬁle and the dated lab notebook are available at
+632   https://github.com/akshayaggarwal99/quant-tool-calling under the MIT licence, at
+633   the release tag v1.3-peerj, which is the version this paper describes. A DOI-bearing archive of
+634   that tag will be deposited at Zenodo on acceptance. The GGUF weight ﬁles are not included; the
+635   scripts rebuild them from the published FP16 checkpoints.
+
+
+636   References
+637   Alan Agresti and Yongyi Min. Simple improved conﬁdence intervals for comparing matched
+638     proportions. Statistics in Medicine, 24(5):729–740, 2005. doi: 10.1002/sim.1781.
+639   Xingyu Chen, Jiahao Xu, Tian Liang, Zhiwei He, Jianhui Pang, Dian Yu, Linfeng Song, Qiuzhi
+640     Liu, Mengfei Zhou, Zhuosheng Zhang, Rui Wang, Zhaopeng Tu, Haitao Mi, and Dong Yu. Do
+641     NOT Think That Much for 2+3=? On the Overthinking of o1-Like LLMs. arXiv preprint
+642     arXiv:2412.21187, 2024.
+643   Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser,
+644     Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, Christopher Hesse, and John
+645     Schulman. Training Veriﬁers to Solve Math Word Problems. arXiv preprint arXiv:2110.14168,
+646     2021.
+647   Robert J. Connor. Sample size for testing differences in proportions for the paired-sample design.
+648     Biometrics, 43(1):207–211, 1987. doi: 10.2307/2531961.
+649   Tim Dettmers and Luke Zettlemoyer. The case for 4-bit precision: k-bit Inference Scaling Laws.
+650     In Proceedings of the 40th International Conference on Machine Learning, 2023.
+651   Tim Dettmers, Mike Lewis, Younes Belkada, and Luke Zettlemoyer. LLM.int8(): 8-bit Matrix
+652     Multiplication for Transformers at Scale. In Advances in Neural Information Processing
+653     Systems 35, 2022.
+654   Erçin Dinçer and Zeynep Hilal Kilimci. Real-time and ofﬂine large language models on edge
+655     devices: a systematic review. PeerJ Computer Science, 12:e3769, 2026. doi:
+656     10.7717/peerj-cs.3769.
+657   Ravitez Dondeti. ToolGuard: Red-Teaming Small Language Model Tool Calling on Consumer
+658     Hardware. Transactions on Machine Learning Research, 2026.
+659     https://openreview.net/forum?id=0ct01Da0Ff.
+660   Elias Frantar, Saleh Ashkboos, Torsten Hoeﬂer, and Dan Alistarh. GPTQ: Accurate Post-Training
+661     Quantization for Generative Pre-trained Transformers. In International Conference on Learning
+662     Representations, 2023.
+663   Georgi Gerganov and contributors. llama.cpp: LLM inference in C/C++.
+664     https://github.com/ggml-org/llama.cpp, 2023.
+665   Gorilla Team, UC Berkeley. Berkeley Function Calling Leaderboard V4: leaderboard data
+666     (data_non_live.csv). https://gorilla.cs.berkeley.edu/leaderboard.html, 2026. Data
+667     ﬁle last modiﬁed 13 April 2026; retrieved 29 September 2026.
+668   Konstantin Hebenstreit, Robert Praas, Louis P. Kiesewetter, and Matthias Samwald. A comparison
+
+                                                      21
+669     of chain-of-thought reasoning strategies across datasets and models. PeerJ Computer Science,
+670     10:e1999, 2024. doi: 10.7717/peerj-cs.1999.
+671   Sture Holm. A simple sequentially rejective multiple test procedure. Scandinavian Journal of
+672     Statistics, 6(2):65–70, 1979.
+673   Renren Jin, Jiangcun Du, Wuwei Huang, Wei Liu, Jian Luan, Bin Wang, and Deyi Xiong. A
+674     Comprehensive Evaluation of Quantization Strategies for Large Language Models. In Findings
+675     of the Association for Computational Linguistics: ACL 2024, 2024.
+676   Tanishq Kumar, Zachary Ankner, Benjamin F. Spector, Blake Bordelon, Niklas Muennighoff,
+677     Mansheej Paul, Cengiz Pehlevan, Christopher Ré, and Aditi Raghunathan. Scaling Laws for
+678     Precision. In International Conference on Learning Representations, 2025.
+679   Uygar Kurt. Which Quantization Should I Use? A Uniﬁed Evaluation of llama.cpp Quantization
+680     on Llama-3.1-8B-Instruct. arXiv preprint arXiv:2601.14277, 2026.
+681   Eldar Kurtic, Alexandre Marques, Shubhra Pandit, Mark Kurtz, and Dan Alistarh. “Give Me
+682     BF16 or Give Me Death”? Accuracy-Performance Trade-Offs in LLM Quantization. In
+683     Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics
+684     (Volume 1: Long Papers), pages 26872–26886, 2025. doi: 10.18653/v1/2025.acl-long.1304.
+685   Jemin Lee, Sihyeong Park, Jinse Kwon, Jihun Oh, and Yongin Kwon. Exploring the Trade-Offs:
+686     Quantization Methods, Task Difﬁculty, and Model Size in Large Language Models From Edge
+687     to Giant. In Proceedings of the Thirty-Fourth International Joint Conference on Artiﬁcial
+688     Intelligence (IJCAI-25), pages 8113–8121, 2025. doi: 10.24963/ijcai.2025/902.
+689   Shiyao Li, Xuefei Ning, Luning Wang, Tengxuan Liu, Xiangsheng Shi, Shengen Yan, Guohao
+690     Dai, Huazhong Yang, and Yu Wang. Evaluating Quantized Large Language Models. In
+691     Proceedings of the 41st International Conference on Machine Learning, 2024.
+692   Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Wei-Ming Chen, Wei-Chen Wang, Guangxuan
+693      Xiao, Xingyu Dang, Chuang Gan, and Song Han. AWQ: Activation-aware Weight Quantization
+694      for On-Device LLM Compression and Acceleration. In Machine Learning and Systems
+695      (MLSys), 2024.
+696   Ruikang Liu, Yuxuan Sun, Manyi Zhang, Haoli Bai, Xianzhi Yu, Tiezheng Yu, Chun Yuan, and
+697     Lu Hou. Quantization Hurts Reasoning? An Empirical Study on Quantized Reasoning Models.
+698     In Conference on Language Modeling (COLM), 2025.
+699   Llama Team, AI @ Meta. The Llama 3 Herd of Models. arXiv preprint arXiv:2407.21783, 2024.
+700   Sanae Lotﬁ, Polina Kirichenko, Steven Li, and Zechun Liu. Quantized Reasoning Models Think
+701     They Need to Think Longer, but They Do Not. arXiv preprint arXiv:2606.00206, 2026.
+702   Jinendra Malekar and Ramtin Zand. Amdahl’s law for LLMs: A throughput-centric analysis of
+703      extreme LLM quantization. Transactions on Machine Learning Research, 2025.
+704   Kelly Marchisio, Saurabh Dash, Hongyu Chen, Dennis Aumiller, Ahmet Üstün, Sara Hooker, and
+705     Sebastian Ruder. How Does Quantization Affect Multilingual LLMs? In Findings of the
+706     Association for Computational Linguistics: EMNLP 2024, 2024.
+707   Quinn McNemar. Note on the Sampling Error of the Difference Between Correlated Proportions
+708     or Percentages. Psychometrika, 12(2):153–157, 1947.
+709   Anmol Mekala, Anirudh Atmakuru, Yixiao Song, Marzena Karpinska, and Mohit Iyyer. Does
+
+                                                     22
+710     Quantization Affect Models’ Performance on Long-Context Tasks? In Proceedings of the 2025
+711     Conference on Empirical Methods in Natural Language Processing, pages 9422–9470, 2025.
+712     doi: 10.18653/v1/2025.emnlp-main.479.
+713   Shishir G. Patil, Tianjun Zhang, Xin Wang, and Joseph E. Gonzalez. Gorilla: Large Language
+714     Model Connected with Massive APIs. In Advances in Neural Information Processing Systems
+715     37, 2024.
+716   Shishir G. Patil, Huanzhi Mao, Fanjia Yan, Charlie Cheng-Jie Ji, Vishnu Suresh, Ion Stoica, and
+717     Joseph E. Gonzalez. The Berkeley Function Calling Leaderboard (BFCL): From tool use to
+718     agentic evaluation of large language models. In Proceedings of the 42nd International
+719     Conference on Machine Learning, volume 267, pages 48371–48392, 2025.
+720   Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan Yan, Yaxi Lu, Yankai Lin, Xin Cong,
+721     Xiangru Tang, Bill Qian, Sihan Zhao, Lauren Hong, Runchu Tian, Ruobing Xie, Jie Zhou,
+722     Mark Gerstein, Dahai Li, Zhiyuan Liu, and Maosong Sun. ToolLLM: Facilitating Large
+723     Language Models to Master 16000+ Real-world APIs. In International Conference on
+724     Learning Representations, 2024.
+725   Qwen Team. Qwen3 Technical Report. arXiv preprint arXiv:2505.09388, 2025.
+726   Yang Sui, Yu-Neng Chuang, Guanchu Wang, Jiamu Zhang, Tianyi Zhang, Jiayi Yuan, Hongyi Liu,
+727     Andrew Wen, Shaochen Zhong, Na Zou, Hanjie Chen, and Xia Hu. Stop Overthinking: A
+728     Survey on Efﬁcient Reasoning for Large Language Models. Transactions on Machine Learning
+729     Research, 2025.
+730   Hazal Turkmen. Generative small language models in clinical NLP: applications, adaptation, and
+731     evaluation. PeerJ Computer Science, 12:e4000, 2026. doi: 10.7717/peerj-cs.4000.
+732   Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed Chi, Quoc
+733     Le, and Denny Zhou. Chain-of-Thought Prompting Elicits Reasoning in Large Language
+734     Models. In Advances in Neural Information Processing Systems 35, 2022.
+735   Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan. τ -bench: A Benchmark for
+736     Tool-Agent-User Interaction in Real-World Domains. In International Conference on Learning
+737     Representations, 2025.
+
+
+
+
+                                                     23
+
