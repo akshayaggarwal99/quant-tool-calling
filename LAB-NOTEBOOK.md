@@ -359,3 +359,75 @@ mention, Llama scripts and coerced.py listed. Local commit and local tag v1.2-pe
 
 PDF at the time of this entry: paper/peerj/main.pdf, 19 pages, sha256 1d3aed529d51a0f76691015c789ae587252116a55e3dc64daa1e15a9d80b4b27 (pre-submission; the
 DOI placeholder still has to be replaced, which changes the hash).
+
+## 30 Sep 2026: citation check of the references added on 29 Sep
+
+Scope: the six refs.bib entries added in 2634389 (dincer2026edge, turkmen2026slm, hebenstreit2024cot,
+kurtic2024bf16, lee2024tradeoffs, bfclleaderboard2026) and the four whose first commit is e9b6250 on
+29 Sep although their comment says 25 Sep (dondeti2026toolguard, malekar2025amdahl,
+mekala2025longcontext, llama3). Each citing sentence in paper/peerj/main.tex was read against the
+paper itself, not only its metadata.
+
+- dincer2026edge. Read: https://peerj.com/articles/cs-3769/ (full HTML text; searched for tool, agentic,
+  small language). Intro sentence ("treat compression as a precondition for running them there at
+  all"): partly supported. The review calls model compression "a central enabler" beside hardware
+  acceleration and hybrid edge-cloud, not a precondition. Related-work sentence ("surveys of small
+  language models ... name tool use as a direction"): unsupported for this paper. It is about LLMs on
+  edge devices, lists quantization among compression techniques, and never mentions tool use; its
+  future directions are co-design, federated learning and secure offloading. Change: intro sentence
+  narrowed to "counts model compression, quantization included, as a central enabler of running these
+  models on memory-limited hardware"; related-work sentence rewritten so this paper is cited only for
+  listing quantization. Bib correct (vol 12, e3769, 2026, DOI 10.7717/peerj-cs.3769).
+- turkmen2026slm. Read: https://peerj.com/articles/cs-4000/ (full HTML text). Lists pruning,
+  quantization and distillation for deriving clinical SLMs (a Quantization subsection) and names
+  agentic frameworks for planning and tool use as a future direction; measures neither. Verdict:
+  supported. Change: the shared sentence was split so the tool-use clause cites only this paper. Bib
+  correct (vol 12, e4000, 2026).
+- hebenstreit2024cot. Read: https://doi.org/10.7717/peerj-cs.1999, full text via Europe PMC
+  (PMC11157560, https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11157560/fullTextXML). Sentence
+  ("whether chain-of-thought helps at all, and by how much, already varies by model and dataset at full
+  precision"): partly supported. The paper's headline is that CoT gains over direct prompting "remain
+  robust across different models and datasets" with some variation (Command-XL and GPT-4 gain most;
+  for Flan-T5 direct prompting is among the best; prompts differ by dataset). It says nothing about
+  numerical precision. Change: "the gain from zero-shot chain-of-thought prompting over direct
+  answering holds on average across six models and six question-answering datasets but varies in size
+  by model and dataset". Bib correct.
+- kurtic2024bf16. Read: https://arxiv.org/pdf/2411.02355 (v4) and https://aclanthology.org/2025.acl-long.1304.pdf.
+  Intro ("academic benchmarks and long-form tasks"): partly supported; the non-academic set is
+  Arena-Hard, HumanEval/HumanEval+ and RULER. Changed to "chat, code-generation and long-context
+  tasks". Related work ("well-tuned INT8 and INT4 weight-only formats close to lossless"): partly
+  supported; the paper calls only FP8 effectively lossless, INT8 1-3% degradation, INT4 weight-only
+  on par with 8-bit. Changed to those three findings. No tool-calling task (grep of full text).
+  Bib: added "(Volume 1: Long Papers)", pages 26872-26886, DOI 10.18653/v1/2025.acl-long.1304 from the
+  Anthology record; dropped the arXiv note.
+- lee2024tradeoffs. Read: https://www.ijcai.org/proceedings/2025/0902.pdf and arXiv 2409.11055v6.
+  1B to 405B, four methods, 13 datasets; quantized models generally beat smaller FP16 baselines but
+  struggle on instruction following and hallucination detection; no tool-calling task. Verdict: both
+  sentences supported. Bib: booktitle set to the proceedings title (IJCAI-25), pages 8113-8121, DOI
+  10.24963/ijcai.2025/902 added; arXiv note dropped.
+- bfclleaderboard2026. Read: https://gorilla.cs.berkeley.edu/leaderboard.html and
+  https://gorilla.cs.berkeley.edu/data_non_live.csv (re-fetched 30 Sep; byte-identical to
+  analysis/bfcl_leaderboard/data_non_live.csv; Last-Modified 13 Apr 2026; page says BFCL V4, last
+  updated 2026-04-12). One Llama-3.1-8B row, "(Prompt)", Python Simple AST 94.00%, no FC row. Verdict:
+  supported. No change.
+- dondeti2026toolguard. Read: https://openreview.net/forum?id=0ct01Da0Ff (TMLR, published 8 Sep 2026).
+  Seven SLMs from 1B to 4B, deterministic would-dispatch rule, consumer hardware. Verdict: supported.
+  No change.
+- malekar2025amdahl. Read: https://openreview.net/forum?id=JtrQJJQYpP (TMLR, 15 Sep 2025). Sentence
+  ("those gains are capped by whatever part of the model stays in higher precision", said of lower
+  bit-widths generally): partly supported; the analysis is for 1-bit and ternary projection weights
+  (W1A8/W2A8) with attention left in higher precision. Change: "show, for binary and ternary weights,
+  that the throughput gain is capped ...". Bib correct.
+- mekala2025longcontext. Read: https://arxiv.org/abs/2505.20276 and https://aclanthology.org/2025.emnlp-main.479.pdf.
+  "Drops of up to 59%" for 4-bit methods on long-context inputs is in the abstract and body of the
+  published version. Verdict: supported. Bib: was an arXiv preprint; now EMNLP 2025 main, pages
+  9422-9470 (printed pages; CrossRef's 9433-9481 disagrees with the PDF), DOI 10.18653/v1/2025.emnlp-main.479.
+- llama3. Read: https://arxiv.org/pdf/2407.21783 (v3). All results are for Llama 3.1; Llama 3.2 is not
+  mentioned. The citation sat after both Llama-3.2-3B-Instruct and Llama-3.1-8B-Instruct: partly
+  supported. Change: "whose Llama 3.1 models are described in \citet{llama3}". Bib correct.
+
+Also: paper/main_tmlr.tex (not edited) has the same llama3 placement after both Llama models and
+the same unqualified malekar2025amdahl sentence; it shares refs.bib, so the bib corrections reach
+it. Rebuilt with tectonic: 19 pages, 0 undefined references, 0 "??". Bibliography page ranges now
+render five en dashes (two before); prose has none. PDF sha256
+90a78d16992bd914382cbe132a731c9e7862fab510f7a2b66c42d62505def386.
