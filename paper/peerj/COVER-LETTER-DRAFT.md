@@ -33,8 +33,8 @@ Points the editor should know.
    Aggarwal, which is the same person. I am employed full time at Amazon; the work is unaffiliated
    with my employer, which is stated in the Competing Interests section.
 5. Data. Code, raw result and score files, generations, server logs, the hypothesis file and the
-   dated lab notebook are at the release tag named in the Data Availability statement, with a
-   Zenodo DOI reserved for that tag.
+   dated lab notebook are public at the release tag v1.3-peerj named in the Data Availability
+   statement; a DOI-bearing Zenodo archive of that tag will be deposited on acceptance.
 6. Generative AI. A large language model coding assistant was used for scripts, drafting and
    citation checks, as declared in the manuscript; I reviewed and am responsible for all content.
 
